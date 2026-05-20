@@ -231,10 +231,10 @@ ${url}`;
               加入會員
             </Link>
             <Link
-              href="/account"
+              href="/member-center"
               className="inline-flex rounded-2xl border border-forest-100 bg-white px-3 py-3 text-xs font-black text-forest-700 shadow-sm sm:px-4 sm:text-sm"
             >
-              會員查詢
+              會員中心
             </Link>
             <Button type="button" variant="outline" size="lg" onClick={() => setScreen("checkout")}>
               <ShoppingCart className="h-5 w-5" />
@@ -340,10 +340,10 @@ ${url}`;
                   <h2 className="text-2xl font-black text-forest-900">商品列表</h2>
                 </div>
                 <Link
-                  href="/account"
+                  href="/member-center"
                   className="rounded-2xl bg-forest-100 px-4 py-3 text-sm font-black text-forest-700 sm:hidden"
                 >
-                  查會員
+                  會員中心
                 </Link>
               </div>
 
@@ -535,10 +535,10 @@ ${url}`;
                 返回首頁
               </Button>
               <Link
-                href="/account"
+                href="/member-center"
                 className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-forest-600 px-4 py-3 text-base font-black text-white"
               >
-                查詢會員餘額
+                會員中心
               </Link>
             </div>
           </section>

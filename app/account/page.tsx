@@ -1,5 +1,5 @@
-import { AccountLookup } from "@/components/AccountLookup";
+import { redirect } from "next/navigation";
 
 export default function AccountPage() {
-  return <AccountLookup />;
+  redirect("/member-center");
 }

@@ -764,6 +764,7 @@ export async function confirmTopupRequestAction(input: unknown): Promise<AdminAc
   revalidatePath("/admin/members");
   revalidatePath("/admin");
   revalidatePath("/account");
+  revalidatePath("/member-center");
   return { ok: true };
 }
 
@@ -782,6 +783,7 @@ export async function cancelTopupRequestAction(input: unknown): Promise<AdminAct
   if (error) return { ok: false, message: error.message };
   revalidatePath("/admin/members");
   revalidatePath("/account");
+  revalidatePath("/member-center");
   return { ok: true };
 }
 
@@ -868,6 +870,7 @@ export async function approveTopupAction(input: unknown): Promise<AdminActionRes
   revalidatePath("/admin/members");
   revalidatePath("/admin");
   revalidatePath("/account");
+  revalidatePath("/member-center");
   return { ok: true };
 }
 
@@ -887,5 +890,6 @@ export async function rejectTopupAction(input: unknown): Promise<AdminActionResu
 
   revalidatePath("/admin/topups");
   revalidatePath("/account");
+  revalidatePath("/member-center");
   return { ok: true };
 }

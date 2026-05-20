@@ -323,6 +323,7 @@ export async function joinMemberAction(input: JoinMemberValues): Promise<ActionR
       }
       if (update.error) return { ok: false, message: update.error.message };
       revalidatePath("/account");
+      revalidatePath("/member-center");
       revalidatePath("/admin");
       revalidatePath("/admin/members");
       return { ok: true, data: { memberId: existing.id } };
@@ -336,6 +337,7 @@ export async function joinMemberAction(input: JoinMemberValues): Promise<ActionR
     if (insert.error || !insert.data) return { ok: false, message: insert.error?.message ?? "會員建立失敗。" };
 
     revalidatePath("/account");
+    revalidatePath("/member-center");
     revalidatePath("/admin");
     revalidatePath("/admin/members");
     return { ok: true, data: { memberId: insert.data.id } };
@@ -505,6 +507,7 @@ export async function createOrderAction(
 
   revalidatePath("/");
   revalidatePath("/account");
+  revalidatePath("/member-center");
   revalidatePath("/admin");
 
   return {
@@ -538,6 +541,35 @@ export async function lookupAccountAction(input: unknown): Promise<ActionResult<
     };
   }
 
+  return getAccountDataForMember(supabase, member);
+}
+
+export async function lookupMemberByLineUserIdAction(lineUserId: string): Promise<ActionResult<AccountLookupResult>> {
+  const supabase = createAdminSupabaseClient();
+  if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
+
+  const safeLineUserId = String(lineUserId ?? "").trim();
+  if (!safeLineUserId) return { ok: false, message: "尚未取得 LINE userId。" };
+
+  const { data: member, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("line_user_id", safeLineUserId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) return { ok: false, message: error.message };
+  if (!member) {
+    return {
+      ok: false,
+      message: "找不到已綁定 LINE 的會員資料，請先完成 LINE 綁定。"
+    };
+  }
+
+  return getAccountDataForMember(supabase, member);
+}
+
+async function getAccountDataForMember(supabase: any, member: any): Promise<ActionResult<AccountLookupResult>> {
   const [ordersResult, walletLogResult, walletTxResult, topupResult, topupRequestResult] = await Promise.all([
     supabase
       .from("orders")
@@ -585,13 +617,16 @@ export async function lookupAccountAction(input: unknown): Promise<ActionResult<
         addressNote: member.address_note ?? null,
         phone: member.phone,
         lineName: member.line_name,
+        lineUserId: member.line_user_id ?? null,
+        lineBoundAt: member.line_bound_at ?? null,
+        lineBindStatus: member.line_bind_status ?? "未綁定",
         balance: toNumber(member.balance),
         totalDeposit: toNumber(member.total_deposit),
         totalSpent: toNumber(member.total_spent),
         createdAt: member.created_at
       },
       orders:
-        ordersResult.data?.map((order): PublicOrder => ({
+        ordersResult.data?.map((order: any): PublicOrder => ({
           id: order.id,
           orderNo: order.order_no,
           totalAmount: toNumber(order.total_amount),
@@ -602,7 +637,7 @@ export async function lookupAccountAction(input: unknown): Promise<ActionResult<
           note: order.note,
           createdAt: order.created_at,
           items:
-            order.order_items?.map((item) => ({
+            order.order_items?.map((item: any) => ({
               productName: item.product_name,
               quantity: Number(item.quantity ?? 0),
               unitPrice: toNumber(item.unit_price),
@@ -657,6 +692,7 @@ export async function createTopupAction(input: TopupValues): Promise<ActionResul
   }
 
   revalidatePath("/account");
+  revalidatePath("/member-center");
   revalidatePath("/admin/topups");
   return { ok: true, data: mapTopup(data) };
 }
@@ -693,6 +729,7 @@ export async function createTopupRequestAction(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/account");
+  revalidatePath("/member-center");
   revalidatePath("/admin/members");
   return { ok: true, data: mapTopupRequest(data) };
 }
