@@ -7,7 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BarChart3,
   Bell,
+  CheckCircle2,
   ClipboardList,
+  Database,
   Edit3,
   Loader2,
   PackagePlus,
@@ -30,7 +32,6 @@ import { ProductImageUpload } from "@/components/admin/product-image-upload";
 import { PaymentStatusBadge, StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   calculateProfit,
@@ -258,36 +259,81 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5">
+    <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
       {message && (
-        <div className="mb-5 rounded-3xl bg-rose-50 p-4 text-sm font-black text-rose-600">
+        <div className="mb-5 rounded-xl border border-rose-100 bg-rose-50 p-4 text-sm font-black text-rose-600">
           {message}
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-        <MetricCard title="今日營業額" value={formatCurrency(metrics.revenue)} icon={<ShoppingBag />} />
-        <MetricCard title="今日毛利" value={formatCurrency(metrics.grossProfit)} icon={<BarChart3 />} />
-        <MetricCard title="今日毛利率" value={formatPercent(metrics.profitRate)} icon={<BarChart3 />} />
-        <MetricCard title="今日訂單數" value={`${metrics.orderCount} 筆`} icon={<ClipboardList />} />
-        <MetricCard title="未領貨數量" value={`${metrics.unpicked} 筆`} icon={<ClipboardList />} />
-        <MetricCard title="已到貨未領數" value={`${metrics.arrivedUnpicked} 筆`} icon={<ClipboardList />} />
-        <MetricCard title="今日退款金額" value={formatCurrency(metrics.todayRefundAmount)} icon={<BarChart3 />} />
-        <MetricCard title="待付款數量" value={`${metrics.pendingPayments} 筆`} icon={<ClipboardList />} />
-        <MetricCard title="會員總餘額" value={formatCurrency(metrics.memberBalance)} icon={<UsersRound />} />
-        <MetricCard title="本週熱門商品" value={metrics.hotProduct} icon={<ShoppingBag />} compact />
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[1fr_360px]">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <Database className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-400">社區代購營運中心</p>
+                <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">
+                  今日工作台
+                </h2>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                營運中
+              </span>
+            </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <ProfileField label="營運日" value={new Date().toLocaleDateString("zh-TW")} />
+              <ProfileField label="商品數" value={`${products.length} 件`} />
+              <ProfileField label="訂單數" value={`${orders.length} 筆`} />
+              <ProfileField label="熱門商品" value={metrics.hotProduct} wide />
+              <ProfileField label="管理狀態" value="集中採購 / 管理室領貨" wide />
+            </div>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-5">
+            <p className="text-sm font-black text-slate-400">今日重點</p>
+            <p className="mt-2 text-4xl font-black text-slate-900">{formatCurrency(metrics.revenue)}</p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <MiniStat label="今日毛利" value={formatCurrency(metrics.grossProfit)} />
+              <MiniStat label="待付款" value={`${metrics.pendingPayments} 筆`} />
+              <MiniStat label="未領貨" value={`${metrics.unpicked} 筆`} />
+              <MiniStat label="會員餘額" value={formatCurrency(metrics.memberBalance)} />
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="mt-6 grid gap-5 lg:grid-cols-[420px_1fr]">
-        <Card>
-          <CardContent>
+      <section id="overview" className="mt-5 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <SectionHeader
+          eyebrow="Dashboard"
+          title="營運摘要"
+          description="把今天最重要的營收、毛利、付款與領貨狀態集中看。"
+        />
+        <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <MetricCard title="今日營業額" value={formatCurrency(metrics.revenue)} icon={<ShoppingBag />} />
+          <MetricCard title="今日毛利" value={formatCurrency(metrics.grossProfit)} icon={<BarChart3 />} />
+          <MetricCard title="今日毛利率" value={formatPercent(metrics.profitRate)} icon={<BarChart3 />} />
+          <MetricCard title="今日訂單數" value={`${metrics.orderCount} 筆`} icon={<ClipboardList />} />
+          <MetricCard title="未領貨數量" value={`${metrics.unpicked} 筆`} icon={<ClipboardList />} />
+          <MetricCard title="已到貨未領數" value={`${metrics.arrivedUnpicked} 筆`} icon={<ClipboardList />} />
+          <MetricCard title="今日退款金額" value={formatCurrency(metrics.todayRefundAmount)} icon={<BarChart3 />} />
+          <MetricCard title="待付款數量" value={`${metrics.pendingPayments} 筆`} icon={<ClipboardList />} />
+          <MetricCard title="會員總餘額" value={formatCurrency(metrics.memberBalance)} icon={<UsersRound />} />
+          <MetricCard title="本週熱門商品" value={metrics.hotProduct} icon={<ShoppingBag />} compact />
+        </div>
+      </section>
+
+      <section id="products" className="mt-5 grid scroll-mt-24 gap-5 xl:grid-cols-[440px_1fr]">
+        <AdminPanel>
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-forest-100 text-forest-700">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-forest-700">
                 <PackagePlus className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-black text-forest-600">商品管理 CRUD</p>
-                <h2 className="text-2xl font-black text-forest-900">
+                <p className="text-sm font-black text-slate-400">商品管理 CRUD</p>
+                <h2 className="text-2xl font-black text-slate-900">
                   {form.watch("id") ? "編輯商品" : "新增商品"}
                 </h2>
               </div>
@@ -351,7 +397,7 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
               <ProductField label="目標毛利率" error={form.formState.errors.targetProfitRate?.message}>
                 <Input type="number" {...form.register("targetProfitRate", { valueAsNumber: true })} />
               </ProductField>
-              <div className="rounded-3xl bg-forest-50 p-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <SummaryRow label="運費" value={formatCurrency(shippingFee)} />
                 <SummaryRow label="毛利" value={formatCurrency(profit)} />
                 <SummaryRow label="毛利率" value={formatPercent(profitRate)} />
@@ -387,27 +433,25 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+        </AdminPanel>
 
-        <Card>
-          <CardContent>
+        <AdminPanel>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-sm font-black text-forest-600">商品清單</p>
-                <h2 className="text-2xl font-black text-forest-900">價格與毛利</h2>
+                <p className="text-sm font-black text-slate-400">商品清單</p>
+                <h2 className="text-2xl font-black text-slate-900">價格與毛利</h2>
               </div>
-              <Link href="/admin/purchase-list" className="text-sm font-black text-forest-700">
+              <Link href="/admin/purchase-list" className="rounded-xl bg-forest-50 px-3 py-2 text-sm font-black text-forest-700">
                 採購清單
               </Link>
             </div>
             <div className="space-y-3">
               {products.map((product) => (
-                <article key={product.id} className="grid gap-3 rounded-3xl border border-forest-100 p-3 sm:grid-cols-[88px_1fr_auto]">
+                <article key={product.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[88px_1fr_auto]">
                   <ProductThumb src={product.imageUrl} alt={product.name} />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-black text-forest-900">
+                      <h3 className="text-lg font-black text-slate-900">
                         {formatProductTitle(product.name, product.spec)}
                       </h3>
                       <Badge>{product.category ?? "未分類"}</Badge>
@@ -437,18 +481,17 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
               ))}
               {products.length === 0 && <EmptyState label="尚未新增商品" />}
             </div>
-          </CardContent>
-        </Card>
+        </AdminPanel>
       </section>
 
-      <section className="mt-6 rounded-[2rem] bg-white p-4 shadow-soft sm:p-6">
+      <section id="orders" className="mt-5 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-black text-forest-600">訂單管理</p>
-            <h2 className="text-2xl font-black text-forest-900">全部訂單</h2>
+            <p className="text-sm font-black text-slate-400">訂單管理</p>
+            <h2 className="text-2xl font-black text-slate-900">全部訂單</h2>
           </div>
           <div className="grid gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
-            <label className="flex min-h-12 items-center gap-2 rounded-2xl border border-forest-100 px-3">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-200 px-3">
               <Search className="h-4 w-4 text-zinc-400" />
               <input
                 value={searchText}
@@ -519,7 +562,7 @@ function OrderCard({
   onCancel: () => void;
 }) {
   return (
-    <article className="rounded-3xl border border-forest-100 p-4">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-3">
           <input
@@ -530,18 +573,23 @@ function OrderCard({
             aria-label={`勾選訂單 ${order.orderNo}`}
           />
           <div>
-          <p className="text-sm font-black text-zinc-500">
+          <p className="text-sm font-black text-slate-400">
             訂單 {order.orderNo} ・ 領貨碼 {order.pickupCode ?? "-"}
           </p>
-          <h3 className="mt-1 text-xl font-black text-forest-900">
+          <h3 className="mt-1 text-xl font-black text-slate-900">
             {order.member?.name ?? "未綁定會員"} / {order.member?.building ?? "-"}
           </h3>
-          <p className="mt-1 text-sm font-bold text-zinc-500">
+          <p className="mt-1 text-sm font-bold text-slate-500">
             {order.member?.phone ?? "-"} ・ LINE {order.member?.lineName ?? "-"}
           </p>
-          <p className="mt-1 text-sm font-bold text-zinc-500">
+          <p className="mt-1 text-sm font-bold text-slate-500">
             會員目前餘額 {formatCurrency(order.member?.balance ?? 0)} ・ 預估到貨 {formatDate(order.estimatedArrivalDate)}
           </p>
+          {order.lineNotified && (
+            <p className="mt-1 text-sm font-bold text-forest-700">
+              LINE 通知時間：{formatDateTime(order.notifiedAt)}
+            </p>
+          )}
           {order.note && <p className="mt-1 text-sm font-bold text-honey-600">備註：{order.note}</p>}
           </div>
         </div>
@@ -553,7 +601,7 @@ function OrderCard({
           <select
             value={order.status}
             onChange={(event) => onStatusChange(event.target.value as OrderStatus)}
-            className="min-h-12 rounded-2xl border border-forest-100 bg-forest-50 px-4 text-sm font-black text-forest-800 outline-none"
+            className="min-h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-700 outline-none"
           >
             {orderStatuses.map((status) => (
               <option key={status} value={status}>
@@ -565,7 +613,7 @@ function OrderCard({
       </div>
       <div className="mt-4 space-y-2">
         {order.items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between rounded-2xl bg-forest-50 px-3 py-2 text-sm font-bold">
+          <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
             <span>{item.productName}</span>
             <span>x {item.quantity}</span>
           </div>
@@ -637,6 +685,43 @@ function Select({
   );
 }
 
+function AdminPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      {children}
+    </section>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-forest-600">{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-black text-slate-900">{title}</h2>
+      </div>
+      <p className="max-w-xl text-sm font-bold text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function ProfileField({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`rounded-xl bg-slate-50 px-4 py-3 ${wide ? "sm:col-span-2" : ""}`}>
+      <p className="text-xs font-black text-slate-400">{label}</p>
+      <p className="mt-1 truncate text-base font-black text-slate-800">{value}</p>
+    </div>
+  );
+}
+
 function MetricCard({
   title,
   value,
@@ -649,17 +734,15 @@ function MetricCard({
   compact?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent>
-        <div className="flex items-center gap-3 text-forest-700">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-forest-100 [&>svg]:h-6 [&>svg]:w-6">
-            {icon}
-          </div>
-          <p className="font-black">{title}</p>
+    <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center gap-3 text-forest-700">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-forest-700 shadow-sm [&>svg]:h-5 [&>svg]:w-5">
+          {icon}
         </div>
-        <p className={`mt-4 font-black text-forest-900 ${compact ? "text-xl" : "text-3xl"}`}>{value}</p>
-      </CardContent>
-    </Card>
+        <p className="text-sm font-black text-slate-500">{title}</p>
+      </div>
+      <p className={`mt-4 font-black text-slate-900 ${compact ? "text-lg" : "text-2xl"}`}>{value}</p>
+    </article>
   );
 }
 
@@ -697,30 +780,30 @@ function CheckField({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-forest-100 py-3 last:border-0">
-      <span className="font-bold text-zinc-500">{label}</span>
-      <span className="font-black text-forest-900">{value}</span>
+    <div className="flex items-center justify-between border-b border-slate-200 py-3 last:border-0">
+      <span className="font-bold text-slate-500">{label}</span>
+      <span className="font-black text-slate-900">{value}</span>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-forest-50 px-3 py-2">
-      <p className="text-xs font-black text-zinc-500">{label}</p>
-      <p className="mt-1 font-black text-forest-900">{value}</p>
+    <div className="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-100">
+      <p className="text-xs font-black text-slate-400">{label}</p>
+      <p className="mt-1 font-black text-slate-900">{value}</p>
     </div>
   );
 }
 
 function ProductThumb({ src, alt }: { src: string | null; alt: string }) {
-  if (!src) return <div className="h-24 w-full rounded-2xl bg-forest-100 sm:w-24" />;
-  return <img src={src} alt={alt} className="h-24 w-full rounded-2xl object-cover sm:w-24" />;
+  if (!src) return <div className="h-24 w-full rounded-xl bg-slate-100 sm:w-24" />;
+  return <img src={src} alt={alt} className="h-24 w-full rounded-xl object-cover sm:w-24" />;
 }
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-forest-100 p-8 text-center font-black text-zinc-500">
+    <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center font-black text-slate-500">
       {label}
     </div>
   );

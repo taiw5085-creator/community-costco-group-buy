@@ -45,7 +45,9 @@ export function AdminMembers({ initialData }: { initialData: DashboardData }) {
 
   const filteredMembers = useMemo(() => {
     return initialData.members.filter((member) => {
-      const text = `${member.name} ${member.phone} ${member.lineName ?? ""} ${member.building ?? ""}`.toLowerCase();
+      const text = `${member.name} ${member.phone} ${member.lineName ?? ""} ${member.building ?? ""} ${
+        member.lineBindStatus ?? ""
+      }`.toLowerCase();
       return text.includes(searchText.toLowerCase());
     });
   }, [initialData.members, searchText]);
@@ -142,6 +144,15 @@ export function AdminMembers({ initialData }: { initialData: DashboardData }) {
                     <p className="mt-2 text-lg font-black text-forest-700">
                       {formatCurrency(member.balance)}
                     </p>
+                    <span
+                      className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-black ${
+                        member.lineUserId
+                          ? "bg-forest-100 text-forest-700"
+                          : "bg-zinc-100 text-zinc-500"
+                      }`}
+                    >
+                      LINE {member.lineUserId ? "已綁定" : "未綁定"}
+                    </span>
                   </button>
                 ))}
                 {filteredMembers.length === 0 && <Empty label="尚無會員資料" />}
@@ -169,6 +180,11 @@ export function AdminMembers({ initialData }: { initialData: DashboardData }) {
                       <Info label="姓名" value={selectedMember.name} />
                       <Info label="棟別" value={selectedMember.building ?? "-"} />
                       <Info label="LINE" value={selectedMember.lineName ?? "-"} />
+                      <Info label="LINE 狀態" value={selectedMember.lineUserId ? "已綁定" : "未綁定"} />
+                      <Info
+                        label="綁定時間"
+                        value={selectedMember.lineBoundAt ? formatDateTime(selectedMember.lineBoundAt) : "-"}
+                      />
                       <Info label="累積儲值" value={formatCurrency(selectedMember.totalDeposit)} />
                       <Info label="累積消費" value={formatCurrency(selectedMember.totalSpent)} />
                     </div>

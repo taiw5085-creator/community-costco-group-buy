@@ -142,6 +142,9 @@ function mapMember(row: any): Member {
     addressNote: row.address_note ?? null,
     phone: row.phone,
     lineName: row.line_name,
+    lineUserId: row.line_user_id ?? null,
+    lineBoundAt: row.line_bound_at ?? null,
+    lineBindStatus: row.line_bind_status ?? "未綁定",
     lookupCode: row.lookup_code,
     balance: toNumber(row.balance),
     totalDeposit: toNumber(row.total_deposit),
@@ -509,9 +512,51 @@ export async function notifyOrderReadyAction(orderId: string): Promise<AdminActi
   const supabase = createAdminSupabaseClient();
   if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
 
+  const { data: order, error: findError } = await supabase
+    .from("orders")
+    .select("*, members(*), order_items(*)")
+    .eq("id", orderId)
+    .single();
+
+  if (findError || !order) return { ok: false, message: findError?.message ?? "找不到訂單。" };
+
+  const member = order.members;
+  if (!member) return { ok: false, message: "此訂單尚未綁定會員，無法推播 LINE。" };
+  if (!member.line_user_id) {
+    return {
+      ok: false,
+      message: "此會員尚未綁定 LINE，請先請客人加入官方帳號並傳送綁定訊息。"
+    };
+  }
+
+  const itemsText =
+    order.order_items
+      ?.map((item: any) => `- ${item.product_name ?? "商品"} x ${Number(item.quantity ?? 0)}`)
+      .join("\n") || "- 商品明細請洽管理員";
+
+  const message = [
+    "📦 商品到貨通知",
+    "",
+    `您好，${member.name}：`,
+    "",
+    "您的商品已到貨。",
+    "",
+    `訂單編號：${order.order_no}`,
+    `領貨碼：${order.pickup_code || "請洽管理員"}`,
+    "",
+    "商品：",
+    itemsText,
+    "",
+    "請至管理室領取，謝謝。"
+  ].join("\n");
+
+  const lineResult = await sendLineMessage(member.line_user_id, message);
+  if (!lineResult.ok) return { ok: false, message: lineResult.message ?? "LINE 推播失敗。" };
+
+  const notifiedAt = new Date().toISOString();
   const { error } = await supabase
     .from("orders")
-    .update({ line_notified: true, notified_at: new Date().toISOString() })
+    .update({ line_notified: true, notified_at: notifiedAt })
     .eq("id", orderId);
 
   if (error) return { ok: false, message: error.message };
@@ -812,10 +857,12 @@ export async function approveTopupAction(input: unknown): Promise<AdminActionRes
 
   if (updateError) return { ok: false, message: updateError.message };
 
-  await sendLineMessage(null, `✅ 儲值成功
+  if (topup.members.line_user_id) {
+    await sendLineMessage(topup.members.line_user_id, `✅ 儲值成功
 金額：$${amount}
 目前餘額：$${balanceAfter}
 可至會員查詢頁查看明細。`);
+  }
 
   revalidatePath("/admin/topups");
   revalidatePath("/admin/members");

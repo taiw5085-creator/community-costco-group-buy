@@ -27,6 +27,9 @@ create table if not exists public.members (
   address_note text,
   phone text not null,
   line_name text,
+  line_user_id text,
+  line_bound_at timestamptz,
+  line_bind_status text default '未綁定',
   lookup_code text not null,
   balance numeric default 0,
   total_deposit numeric default 0,
@@ -119,6 +122,9 @@ create table if not exists public.topup_requests (
 
 alter table public.products add column if not exists spec text;
 alter table public.members add column if not exists address_note text;
+alter table public.members add column if not exists line_user_id text;
+alter table public.members add column if not exists line_bound_at timestamptz;
+alter table public.members add column if not exists line_bind_status text default '未綁定';
 alter table public.orders add column if not exists pickup_code text;
 alter table public.orders add column if not exists estimated_arrival_date date;
 alter table public.orders add column if not exists line_notified boolean default false;
@@ -177,6 +183,7 @@ create index if not exists products_slug_idx on public.products(slug);
 create index if not exists products_active_deadline_idx on public.products(is_active, deadline);
 create index if not exists members_phone_lookup_idx on public.members(phone, lookup_code);
 create index if not exists members_phone_building_idx on public.members(phone, building);
+create index if not exists members_line_user_id_idx on public.members(line_user_id);
 create index if not exists orders_member_idx on public.orders(member_id);
 create index if not exists orders_pickup_code_idx on public.orders(pickup_code);
 create index if not exists order_items_order_idx on public.order_items(order_id);

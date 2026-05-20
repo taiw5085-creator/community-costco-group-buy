@@ -63,6 +63,9 @@ export type Member = {
   addressNote?: string | null;
   phone: string;
   lineName: string | null;
+  lineUserId?: string | null;
+  lineBoundAt?: string | null;
+  lineBindStatus?: string | null;
   lookupCode?: string;
   balance: number;
   totalDeposit: number;
