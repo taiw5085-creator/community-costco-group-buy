@@ -24,7 +24,7 @@ async function callLineApi(endpoint: string, body: unknown): Promise<LineApiResu
   if (!token) {
     return {
       ok: false,
-      message: "尚未設定 LINE_CHANNEL_ACCESS_TOKEN，無法發送 LINE 訊息。"
+      message: "LINE_ENV_MISSING"
     };
   }
 
@@ -32,7 +32,7 @@ async function callLineApi(endpoint: string, body: unknown): Promise<LineApiResu
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json; charset=utf-8"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify(body)
   });
@@ -42,7 +42,7 @@ async function callLineApi(endpoint: string, body: unknown): Promise<LineApiResu
     return {
       ok: false,
       status: response.status,
-      message: `LINE API 錯誤 ${response.status}：${text || response.statusText}`
+      message: response.status === 401 ? "LINE_TOKEN_INVALID" : `LINE_API_ERROR_${response.status}:${text}`
     };
   }
 
@@ -50,7 +50,7 @@ async function callLineApi(endpoint: string, body: unknown): Promise<LineApiResu
 }
 
 export async function replyLineMessage(replyToken: string, text: string) {
-  if (!replyToken) return { ok: false, message: "缺少 LINE replyToken。" };
+  if (!replyToken) return { ok: false, message: "LINE_REPLY_TOKEN_MISSING" };
   return callLineApi("reply", {
     replyToken,
     messages: [{ type: "text", text }]
@@ -58,7 +58,7 @@ export async function replyLineMessage(replyToken: string, text: string) {
 }
 
 export async function pushLineMessage(userId: string, text: string) {
-  if (!userId) return { ok: false, message: "會員尚未綁定 LINE userId。" };
+  if (!userId) return { ok: false, message: "LINE_USER_ID_MISSING" };
   return callLineApi("push", {
     to: userId,
     messages: [{ type: "text", text }]
@@ -66,6 +66,6 @@ export async function pushLineMessage(userId: string, text: string) {
 }
 
 export async function sendLineMessage(userId: string | null | undefined, message: string) {
-  if (!userId) return { ok: false, message: "會員尚未綁定 LINE，無法發送通知。" };
+  if (!userId) return { ok: false, message: "LINE_USER_ID_MISSING" };
   return pushLineMessage(userId, message);
 }

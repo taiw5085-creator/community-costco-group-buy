@@ -12,6 +12,16 @@ function sign(value: string) {
   return createHmac("sha256", getSecret()).update(value).digest("hex");
 }
 
+function hexToBytes(value: string) {
+  if (!/^[0-9a-f]+$/i.test(value) || value.length % 2 !== 0) return null;
+
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < value.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
+  }
+  return bytes;
+}
+
 export async function isAdminSessionValid() {
   const secret = getSecret();
   if (!secret) return false;
@@ -24,8 +34,9 @@ export async function isAdminSessionValid() {
   if (!sessionValue || !signature) return false;
 
   const expected = sign(sessionValue);
-  const actualBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = hexToBytes(signature);
+  const expectedBuffer = hexToBytes(expected);
+  if (!actualBuffer || !expectedBuffer) return false;
 
   if (actualBuffer.length !== expectedBuffer.length) return false;
   return timingSafeEqual(actualBuffer, expectedBuffer);
