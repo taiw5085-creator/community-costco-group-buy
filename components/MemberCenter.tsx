@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircle, WalletCards } from "lucide-react";
 import { lookupMemberByLineUserIdAction } from "@/app/actions";
 import { PaymentStatusBadge, StatusBadge } from "@/components/StatusBadge";
@@ -51,18 +50,30 @@ function loadLiffSdk() {
 }
 
 export function MemberCenter() {
-  const router = useRouter();
   const [result, setResult] = useState<AccountLookupResult | null>(null);
   const [message, setMessage] = useState("正在透過 LINE 自動辨識會員...");
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(true);
+  const [showBindGuide, setShowBindGuide] = useState(false);
+  const hasInitializedRef = useRef(false);
+  const hasCalledLoginRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function identifyMember() {
+      if (hasInitializedRef.current) return;
+      hasInitializedRef.current = true;
+
       const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID;
+      const isInClient = typeof window !== "undefined";
+
+      console.log("LIFF_ID", liffId);
+      console.log("isInClient", isInClient);
+
       if (!liffId) {
-        router.replace("/line-bind");
+        setIsLoading(false);
+        setShowBindGuide(false);
+        setMessage("尚未設定 LIFF ID");
         return;
       }
 
@@ -71,30 +82,51 @@ export function MemberCenter() {
         if (!window.liff) throw new Error("LIFF SDK 尚未就緒。");
 
         await window.liff.init({ liffId });
-        if (!window.liff.isLoggedIn()) {
-          window.liff.login({ redirectUri: window.location.href });
+        const isLoggedIn = window.liff.isLoggedIn();
+        console.log("isLoggedIn", isLoggedIn);
+
+        if (!isLoggedIn) {
+          if (!hasCalledLoginRef.current) {
+            hasCalledLoginRef.current = true;
+            window.liff.login({
+              redirectUri: `${window.location.origin}/member-center`
+            });
+          }
           return;
         }
 
         const profile = await window.liff.getProfile();
+        console.log("profile.userId", profile.userId);
+
         if (!profile.userId) {
-          router.replace("/line-bind");
+          if (!cancelled) {
+            setIsLoading(false);
+            setShowBindGuide(true);
+            setMessage("無法取得 LINE 身分，請重新開啟會員中心或確認 LINE 登入狀態。");
+          }
           return;
         }
 
-        startTransition(async () => {
-          const response = await lookupMemberByLineUserIdAction(profile.userId);
-          if (cancelled) return;
-          if (!response.ok || !response.data) {
-            router.replace("/line-bind");
-            return;
-          }
-          setResult(response.data);
-          setMessage("");
-        });
+        const response = await lookupMemberByLineUserIdAction(profile.userId);
+        if (cancelled) return;
+        if (!response.ok || !response.data) {
+          setIsLoading(false);
+          setShowBindGuide(true);
+          setMessage("尚未綁定 LINE，請先到官方帳號輸入綁定 手機號碼 棟別樓號");
+          return;
+        }
+
+        setResult(response.data);
+        setMessage("");
+        setIsLoading(false);
+        setShowBindGuide(false);
       } catch (error) {
         console.error(error);
-        if (!cancelled) router.replace("/line-bind");
+        if (!cancelled) {
+          setIsLoading(false);
+          setShowBindGuide(true);
+          setMessage("LINE 會員辨識失敗，請確認 LIFF 設定或稍後再試。");
+        }
       }
     }
 
@@ -102,7 +134,7 @@ export function MemberCenter() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   const unpickedOrders = useMemo(
     () => result?.orders.filter((order) => order.status === "已到貨") ?? [],
@@ -117,18 +149,30 @@ export function MemberCenter() {
       <main className="min-h-screen bg-forest-50 px-4 py-6">
         <section className="mx-auto max-w-xl rounded-2xl border border-forest-100 bg-white p-6 text-center shadow-soft">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-forest-100 text-forest-700">
-            {isPending ? <Loader2 className="h-7 w-7 animate-spin" /> : <MessageCircle className="h-7 w-7" />}
+            {isLoading ? <Loader2 className="h-7 w-7 animate-spin" /> : <MessageCircle className="h-7 w-7" />}
           </div>
-          <h1 className="mt-4 text-2xl font-black text-forest-900">LINE 會員辨識中</h1>
+          <h1 className="mt-4 text-2xl font-black text-forest-900">
+            {isLoading ? "LINE 會員辨識中" : "會員中心"}
+          </h1>
           <p className="mt-3 font-bold leading-7 text-zinc-500">
             {message || "請稍候，正在載入您的會員資料。"}
           </p>
-          <Link
-            href="/line-bind"
-            className="mt-5 inline-flex min-h-12 items-center justify-center rounded-2xl bg-forest-600 px-4 font-black text-white"
-          >
-            查看 LINE 綁定說明
-          </Link>
+          {showBindGuide && (
+            <div className="mt-5 space-y-3">
+              <div className="rounded-2xl bg-forest-50 p-4 text-left font-bold leading-7 text-forest-800">
+                <p>請加入 LINE 官方帳號，並傳送：</p>
+                <p className="mt-2 rounded-xl bg-white px-3 py-2 font-black text-forest-900">
+                  綁定 0912345678 416 14F2
+                </p>
+              </div>
+              <Link
+                href="/line-bind"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-forest-600 px-4 font-black text-white"
+              >
+                查看 LINE 綁定說明
+              </Link>
+            </div>
+          )}
         </section>
       </main>
     );
