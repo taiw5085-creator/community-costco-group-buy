@@ -54,6 +54,20 @@ async function reply(replyToken: string | undefined, text: string) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    return await handleLineWebhook(request);
+  } catch (error) {
+    console.error(error);
+    return Response.json(
+      {
+        error: String(error)
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleLineWebhook(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("x-line-signature");
   const channelSecret = process.env.LINE_CHANNEL_SECRET;
