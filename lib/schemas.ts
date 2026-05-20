@@ -48,7 +48,7 @@ export const joinMemberSchema = z.object({
   name: z.string().trim().min(2, "請輸入姓名"),
   phone: z.string().trim().min(8, "請輸入手機號碼"),
   lineName: z.string().trim().min(1, "請輸入 LINE 名稱"),
-  addressNote: z.string().trim().min(1, "請輸入社區 / 棟別 / 樓層"),
+  building: z.string().trim().min(1, "請輸入棟別樓號"),
   note: z.string().trim().max(120, "備註最多 120 字")
 });
 

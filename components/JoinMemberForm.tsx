@@ -21,7 +21,7 @@ export function JoinMemberForm() {
       name: "",
       phone: "",
       lineName: "",
-      addressNote: "",
+      building: "",
       note: ""
     },
     mode: "onBlur"
@@ -38,7 +38,7 @@ export function JoinMemberForm() {
       }
 
       setSuccess(true);
-      setMessage("會員資料已送出，請加入 LINE 官方帳號接收通知。");
+      setMessage("會員建立成功，請到 LINE 官方帳號輸入「綁定 手機號碼 棟別樓號」完成通知綁定。");
       form.reset();
     });
   }
@@ -61,7 +61,7 @@ export function JoinMemberForm() {
               </div>
             </div>
             <p className="mt-4 font-bold leading-7 text-zinc-500">
-              請填寫基本資料，完成後即可使用社區代購服務。下單、儲值與餘額查詢都會以手機號碼做識別。
+              請填寫基本資料，完成後即可使用社區代購服務。下單、儲值與餘額查詢會以手機號碼與棟別樓號做識別。
             </p>
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
@@ -74,8 +74,8 @@ export function JoinMemberForm() {
               <FormField label="LINE 名稱" error={form.formState.errors.lineName?.message}>
                 <Input placeholder="例如：A棟小林" {...form.register("lineName")} />
               </FormField>
-              <FormField label="社區 / 棟別 / 樓層" error={form.formState.errors.addressNote?.message}>
-                <Input placeholder="例如：幸福社區 A棟 8樓 801" {...form.register("addressNote")} />
+              <FormField label="棟別樓號" error={form.formState.errors.building?.message}>
+                <Input placeholder="例如：416 14F2" {...form.register("building")} />
               </FormField>
               <label className="block">
                 <span className="text-sm font-black text-zinc-600">備註</span>

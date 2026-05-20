@@ -281,51 +281,68 @@ export async function getPublicProductBySlugAction(
 }
 
 export async function joinMemberAction(input: JoinMemberValues): Promise<ActionResult<{ memberId: string }>> {
-  const values = joinMemberSchema.parse(input);
+  const parsed = joinMemberSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "會員資料格式不正確。" };
+  }
+
+  const values = parsed.data;
   const supabase = createAdminSupabaseClient();
-  if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
+  if (!supabase) {
+    return {
+      ok: false,
+      message: "尚未設定 Supabase。請確認 Vercel Environment Variables 有 NEXT_PUBLIC_SUPABASE_URL 與 SUPABASE_SERVICE_ROLE_KEY。"
+    };
+  }
 
-  const phone = normalizePhone(values.phone);
-  const { data: members, error: queryError } = await supabase
-    .from("members")
-    .select("*")
-    .eq("is_active", true);
+  try {
+    const phone = normalizePhone(values.phone);
+    const { data: members, error: queryError } = await supabase
+      .from("members")
+      .select("*");
 
-  if (queryError) return { ok: false, message: queryError.message };
+    if (queryError) return { ok: false, message: queryError.message };
 
-  const existing = members?.find((member) => normalizePhone(member.phone) === phone);
-  const payload = {
-    name: values.name,
-    building: values.addressNote,
-    address_note: values.addressNote,
-    phone,
-    line_name: values.lineName,
-    lookup_code: existing?.lookup_code ?? makeLookupCode(),
-    balance: existing?.balance ?? 0
-  };
+    const existing = members?.find((member) => normalizePhone(member.phone) === phone);
+    const payload = {
+      name: values.name,
+      building: values.building,
+      address_note: values.note || null,
+      phone,
+      line_name: values.lineName,
+      lookup_code: existing?.lookup_code ?? makeLookupCode(),
+      balance: existing?.balance ?? 0,
+      is_active: true
+    };
 
-  if (existing) {
-    let update = await supabase.from("members").update(payload).eq("id", existing.id).select("id").single();
-    if (update.error && isMissingColumn(update.error, "address_note")) {
-      const { address_note: _unused, ...fallbackPayload } = payload;
-      update = await supabase.from("members").update(fallbackPayload).eq("id", existing.id).select("id").single();
+    if (existing) {
+      let update = await supabase.from("members").update(payload).eq("id", existing.id).select("id").single();
+      if (update.error && isMissingColumn(update.error, "address_note")) {
+        const { address_note: _unused, ...fallbackPayload } = payload;
+        update = await supabase.from("members").update(fallbackPayload).eq("id", existing.id).select("id").single();
+      }
+      if (update.error) return { ok: false, message: update.error.message };
+      revalidatePath("/account");
+      revalidatePath("/admin");
+      revalidatePath("/admin/members");
+      return { ok: true, data: { memberId: existing.id } };
     }
-    if (update.error) return { ok: false, message: update.error.message };
+
+    let insert = await supabase.from("members").insert(payload).select("id").single();
+    if (insert.error && isMissingColumn(insert.error, "address_note")) {
+      const { address_note: _unused, ...fallbackPayload } = payload;
+      insert = await supabase.from("members").insert(fallbackPayload).select("id").single();
+    }
+    if (insert.error || !insert.data) return { ok: false, message: insert.error?.message ?? "會員建立失敗。" };
+
     revalidatePath("/account");
+    revalidatePath("/admin");
     revalidatePath("/admin/members");
-    return { ok: true, data: { memberId: existing.id } };
+    return { ok: true, data: { memberId: insert.data.id } };
+  } catch (error) {
+    console.error(error);
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }
-
-  let insert = await supabase.from("members").insert(payload).select("id").single();
-  if (insert.error && isMissingColumn(insert.error, "address_note")) {
-    const { address_note: _unused, ...fallbackPayload } = payload;
-    insert = await supabase.from("members").insert(fallbackPayload).select("id").single();
-  }
-  if (insert.error || !insert.data) return { ok: false, message: insert.error?.message ?? "會員建立失敗。" };
-
-  revalidatePath("/account");
-  revalidatePath("/admin/members");
-  return { ok: true, data: { memberId: insert.data.id } };
 }
 
 export async function createOrderAction(
