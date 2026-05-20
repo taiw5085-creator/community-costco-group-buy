@@ -15,9 +15,10 @@ export function verifyLineSignature(body: string, signature: string | null, chan
   if (!channelSecret) return false;
   if (!signature) return false;
 
-  const expected = createHmac("sha256", channelSecret).update(body).digest("base64");
-  const expectedBuffer = Buffer.from(expected);
-  const signatureBuffer = Buffer.from(signature);
+  const expected = createHmac("sha256", channelSecret).update(body, "utf8").digest("base64");
+  const encoder = new TextEncoder();
+  const expectedBuffer = encoder.encode(expected);
+  const signatureBuffer = encoder.encode(signature);
 
   if (expectedBuffer.length !== signatureBuffer.length) return false;
   return timingSafeEqual(expectedBuffer, signatureBuffer);
@@ -36,7 +37,7 @@ async function callLineApi(endpoint: string, body: unknown): Promise<LineApiResu
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json; charset=utf-8"
     },
     body: JSON.stringify(body)
   });

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { normalizeBuilding, normalizePhone } from "@/lib/calculations";
 import { replyLineMessage, verifyLineSignature } from "@/lib/line";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -19,6 +19,15 @@ type LineWebhookEvent = {
 type LineWebhookBody = {
   events?: LineWebhookEvent[];
 };
+
+function jsonResponse(payload: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8"
+    }
+  });
+}
 
 function parseBindMessage(text: string) {
   const parts = text.trim().split(/\s+/);
@@ -50,26 +59,26 @@ export async function POST(request: NextRequest) {
   const channelSecret = process.env.LINE_CHANNEL_SECRET;
 
   if (!channelSecret) {
-    return NextResponse.json(
-      { ok: false, message: "尚未設定 LINE_CHANNEL_SECRET，無法驗證 LINE Webhook。" },
-      { status: 500 }
+    return jsonResponse(
+      { success: false, message: "尚未設定 LINE_CHANNEL_SECRET，無法驗證 LINE Webhook。" },
+      500
     );
   }
 
   if (!verifyLineSignature(body, signature, channelSecret)) {
-    return NextResponse.json({ ok: false, message: "LINE signature 驗證失敗。" }, { status: 401 });
+    return jsonResponse({ success: false, message: "LINE signature 驗證失敗。" }, 401);
   }
 
   let payload: LineWebhookBody;
   try {
     payload = JSON.parse(body) as LineWebhookBody;
   } catch {
-    return NextResponse.json({ ok: false, message: "Webhook body JSON 格式錯誤。" }, { status: 400 });
+    return jsonResponse({ success: false, message: "Webhook body JSON 格式錯誤。" }, 400);
   }
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
-    return NextResponse.json({ ok: false, message: "尚未設定 Supabase service role。" }, { status: 500 });
+    return jsonResponse({ success: false, message: "尚未設定 Supabase service role。" }, 500);
   }
 
   for (const event of payload.events ?? []) {
@@ -125,5 +134,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return jsonResponse({ success: true });
 }
