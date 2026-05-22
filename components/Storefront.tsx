@@ -212,12 +212,6 @@ ${url}`;
               查看商品
             </Link>
             <Link
-              href="/signup"
-              className="hidden rounded-2xl border border-forest-100 bg-white px-3 py-3 text-xs font-black text-forest-700 shadow-sm sm:inline-flex sm:px-4 sm:text-sm"
-            >
-              加入會員
-            </Link>
-            <Link
               href="/member-center"
               className="inline-flex rounded-2xl border border-forest-100 bg-white px-3 py-3 text-xs font-black text-forest-700 shadow-sm sm:px-4 sm:text-sm"
             >

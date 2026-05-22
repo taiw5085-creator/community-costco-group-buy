@@ -6,11 +6,23 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, Send, UserPlus } from "lucide-react";
-import { joinMemberAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { joinMemberSchema, type JoinMemberValues } from "@/lib/schemas";
+
+type MemberApiResponse = {
+  success: boolean;
+  message: string;
+  detail?: string;
+};
+
+const memberMessageMap: Record<string, string> = {
+  MEMBER_CREATED: "會員建立成功，請至會員中心完成 LINE 綁定。",
+  SUPABASE_INSERT_FAILED: "會員建立失敗，請稍後再試。",
+  SUPABASE_ENV_MISSING: "系統設定尚未完成，請聯絡管理員。",
+  INVALID_MEMBER_PAYLOAD: "請確認會員資料是否完整。"
+};
 
 export function JoinMemberForm() {
   const router = useRouter();
@@ -33,18 +45,38 @@ export function JoinMemberForm() {
     setMessage("");
     setSuccess(false);
     startTransition(async () => {
-      const result = await joinMemberAction(values);
-      if (!result.ok) {
-        setMessage(result.message ?? "會員資料送出失敗，請稍後再試。");
+      try {
+        const response = await fetch("/api/members", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: values.name,
+            phone: values.phone,
+            line_name: values.lineName,
+            building: values.building,
+            note: values.note
+          })
+        });
+        const result = (await response.json()) as MemberApiResponse;
+
+        if (!response.ok || !result.success) {
+          setMessage(memberMessageMap[result.message] ?? "會員建立失敗，請稍後再試。");
+          return;
+        }
+
+        setSuccess(true);
+        setMessage(memberMessageMap[result.message] ?? memberMessageMap.MEMBER_CREATED);
+        form.reset();
+        window.setTimeout(() => {
+          router.replace("/member-center");
+        }, 2000);
+      } catch (error) {
+        console.error(error);
+        setMessage("會員建立失敗，請稍後再試。");
         return;
       }
-
-      setSuccess(true);
-      setMessage("會員建立成功，請至會員中心完成 LINE 綁定。");
-      form.reset();
-      window.setTimeout(() => {
-        router.replace("/member-center");
-      }, 2000);
     });
   }
 
