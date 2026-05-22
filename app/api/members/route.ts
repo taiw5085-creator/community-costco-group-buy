@@ -30,6 +30,10 @@ function isMissingColumn(detail: string, column: string) {
   return detail.toLowerCase().includes(column.toLowerCase()) && detail.toLowerCase().includes("column");
 }
 
+function createInternalLookupCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
 async function insertMember(payload: Record<string, unknown>) {
   const config = getAdminSupabaseRestConfig();
   if (!config) {
@@ -94,6 +98,7 @@ export async function POST(req: NextRequest) {
     phone,
     line_name: lineName,
     building,
+    lookup_code: createInternalLookupCode(),
     note: note || null,
     balance: 0,
     line_bind_status: "pending",
