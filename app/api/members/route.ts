@@ -47,13 +47,12 @@ export async function POST(req: NextRequest) {
     building,
     note: note || null,
     balance: 0,
-    line_user_id: null,
     line_bind_status: "pending",
     created_at: new Date().toISOString()
   });
 
   if (error) {
-    console.error("[MEMBER_CREATE_INSERT_FAILED]", error);
+    console.error("[CREATE_MEMBER_FAILED]", error);
     return jsonResponse(
       {
         success: false,

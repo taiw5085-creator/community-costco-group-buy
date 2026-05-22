@@ -62,6 +62,10 @@ export function JoinMemberForm() {
         const result = (await response.json()) as MemberApiResponse;
 
         if (!response.ok || !result.success) {
+          if (result.message === "SUPABASE_INSERT_FAILED" && result.detail) {
+            setMessage(`會員建立失敗：${result.detail}`);
+            return;
+          }
           setMessage(memberMessageMap[result.message] ?? "會員建立失敗，請稍後再試。");
           return;
         }
