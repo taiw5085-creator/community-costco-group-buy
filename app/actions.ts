@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { sendLineMessage } from "@/services/line";
 import {
   accountLookupSchema,
   cartItemSchema,
@@ -129,7 +130,7 @@ function mapWalletLog(row: any): WalletLog {
     type: row.type === "deposit" ? "topup" : row.type,
     amount: toNumber(row.amount),
     balanceAfter: toNumber(row.balance_after),
-    note: row.note,
+    note: row.description ?? row.note,
     createdAt: row.created_at
   };
 }
@@ -172,6 +173,7 @@ async function insertWalletLedgers(input: {
     type: input.type,
     amount: input.amount,
     balance_after: input.balanceAfter,
+    description: input.note,
     note: input.note
   });
 
@@ -244,18 +246,29 @@ export async function listPublicProductsAction(): Promise<ActionResult<PublicPro
   const supabase = createAdminSupabaseClient();
   if (!supabase) return { ok: true, data: [] };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("products")
-    .select("id,name,slug,image_url,category,price,deadline,is_hot")
+    .select("id,name,slug,image_url,category,spec,price,deadline,is_hot")
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
+  if (error && isMissingColumn(error, "spec")) {
+    const fallback = await supabase
+      .from("products")
+      .select("id,name,slug,image_url,category,price,deadline,is_hot")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
+
   if (error) return { ok: false, data: [], message: error.message };
 
-  const counts = await getOrderCounts(data.map((row) => row.id));
+  const rows = data ?? [];
+  const counts = await getOrderCounts(rows.map((row) => row.id));
   return {
     ok: true,
-    data: data.map((row) => mapPublicProduct(row, counts.get(row.id) ?? 0))
+    data: rows.map((row) => mapPublicProduct(row, counts.get(row.id) ?? 0))
   };
 }
 
@@ -265,12 +278,23 @@ export async function getPublicProductBySlugAction(
   const supabase = createAdminSupabaseClient();
   if (!supabase) return { ok: true, data: null };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("products")
-    .select("id,name,slug,image_url,category,price,deadline,is_hot")
+    .select("id,name,slug,image_url,category,spec,price,deadline,is_hot")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
+
+  if (error && isMissingColumn(error, "spec")) {
+    const fallback = await supabase
+      .from("products")
+      .select("id,name,slug,image_url,category,price,deadline,is_hot")
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .single();
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
 
   if (error || !data) return { ok: true, data: null };
 
@@ -308,18 +332,23 @@ export async function joinMemberAction(input: JoinMemberValues): Promise<ActionR
     const payload = {
       name: values.name,
       building: values.building,
+      note: values.note || null,
       address_note: values.note || null,
       phone,
       line_name: values.lineName,
       lookup_code: existing?.lookup_code ?? makeLookupCode(),
       balance: existing?.balance ?? 0,
+      line_bind_status: existing?.line_bind_status ?? "pending",
       is_active: true
     };
 
     if (existing) {
       let update = await supabase.from("members").update(payload).eq("id", existing.id).select("id").single();
-      if (update.error && isMissingColumn(update.error, "address_note")) {
-        const { address_note: _unused, ...fallbackPayload } = payload;
+      if (
+        update.error &&
+        (isMissingColumn(update.error, "address_note") || isMissingColumn(update.error, "note"))
+      ) {
+        const { address_note: _unusedAddress, note: _unusedNote, ...fallbackPayload } = payload;
         update = await supabase.from("members").update(fallbackPayload).eq("id", existing.id).select("id").single();
       }
       if (update.error) return { ok: false, message: update.error.message };
@@ -331,8 +360,11 @@ export async function joinMemberAction(input: JoinMemberValues): Promise<ActionR
     }
 
     let insert = await supabase.from("members").insert(payload).select("id").single();
-    if (insert.error && isMissingColumn(insert.error, "address_note")) {
-      const { address_note: _unused, ...fallbackPayload } = payload;
+    if (
+      insert.error &&
+      (isMissingColumn(insert.error, "address_note") || isMissingColumn(insert.error, "note"))
+    ) {
+      const { address_note: _unusedAddress, note: _unusedNote, ...fallbackPayload } = payload;
       insert = await supabase.from("members").insert(fallbackPayload).select("id").single();
     }
     if (insert.error || !insert.data) return { ok: false, message: insert.error?.message ?? "會員建立失敗。" };
@@ -420,14 +452,19 @@ export async function createOrderAction(
     const memberPayload = {
       name: customer.name,
       building: customer.building,
+      note: customer.note || null,
       address_note: customer.building,
       phone,
       line_name: customer.lineName,
-      lookup_code: lookupCode
+      lookup_code: lookupCode,
+      line_bind_status: "pending"
     };
     let created = await supabase.from("members").insert(memberPayload).select("*").single();
-    if (created.error && isMissingColumn(created.error, "address_note")) {
-      const { address_note: _unused, ...fallbackPayload } = memberPayload;
+    if (
+      created.error &&
+      (isMissingColumn(created.error, "address_note") || isMissingColumn(created.error, "note"))
+    ) {
+      const { address_note: _unusedAddress, note: _unusedNote, ...fallbackPayload } = memberPayload;
       created = await supabase.from("members").insert(fallbackPayload).select("*").single();
     }
     if (created.error) return { ok: false, message: created.error.message };
@@ -436,13 +473,17 @@ export async function createOrderAction(
     const updatePayload = {
       name: customer.name,
       building: customer.building,
+      note: customer.note || null,
       address_note: customer.building,
       phone,
       line_name: customer.lineName
     };
     let updated = await supabase.from("members").update(updatePayload).eq("id", member.id);
-    if (updated.error && isMissingColumn(updated.error, "address_note")) {
-      const { address_note: _unused, ...fallbackPayload } = updatePayload;
+    if (
+      updated.error &&
+      (isMissingColumn(updated.error, "address_note") || isMissingColumn(updated.error, "note"))
+    ) {
+      const { address_note: _unusedAddress, note: _unusedNote, ...fallbackPayload } = updatePayload;
       updated = await supabase.from("members").update(fallbackPayload).eq("id", member.id);
     }
     if (updated.error) return { ok: false, message: updated.error.message };
@@ -450,18 +491,22 @@ export async function createOrderAction(
 
   const balance = toNumber(member.balance);
   const canDeduct = balance >= totalAmount;
-  const balanceAfter = canDeduct ? balance - totalAmount : balance;
+  if (!canDeduct) {
+    return { ok: false, message: "餘額不足，請先儲值" };
+  }
+
+  const balanceAfter = balance - totalAmount;
   const orderNo = makeOrderNo();
 
-  const { data: order, error: orderError } = await supabase
+  let { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
       order_no: orderNo,
       member_id: member.id,
       total_amount: totalAmount,
       total_profit: totalProfit,
-      status: canDeduct ? "已付款" : "待付款",
-      payment_status: canDeduct ? "已扣款" : "待付款",
+      status: "placed",
+      payment_status: "已扣款",
       pickup_code: makePickupCode(),
       estimated_arrival_date: getEstimatedArrivalDate(),
       note: customer.note
@@ -469,7 +514,27 @@ export async function createOrderAction(
     .select("id")
     .single();
 
-  if (orderError) return { ok: false, message: orderError.message };
+  if (orderError && `${orderError.message}`.includes("orders_status_check")) {
+    const fallback = await supabase
+      .from("orders")
+      .insert({
+        order_no: orderNo,
+        member_id: member.id,
+        total_amount: totalAmount,
+        total_profit: totalProfit,
+        status: "已付款",
+        payment_status: "已扣款",
+        pickup_code: makePickupCode(),
+        estimated_arrival_date: getEstimatedArrivalDate(),
+        note: customer.note
+      })
+      .select("id")
+      .single();
+    order = fallback.data;
+    orderError = fallback.error;
+  }
+
+  if (orderError || !order) return { ok: false, message: orderError?.message ?? "訂單建立失敗。" };
 
   const { error: itemError } = await supabase.from("order_items").insert(
     orderItems.map((item) => ({
@@ -480,30 +545,35 @@ export async function createOrderAction(
 
   if (itemError) return { ok: false, message: itemError.message };
 
-  if (canDeduct) {
-    const { error: memberUpdateError } = await supabase
-      .from("members")
-      .update({
-        balance: balanceAfter,
-        total_spent: toNumber(member.total_spent) + totalAmount
-      })
-      .eq("id", member.id);
+  const { error: memberUpdateError } = await supabase
+    .from("members")
+    .update({
+      balance: balanceAfter,
+      total_spent: toNumber(member.total_spent) + totalAmount
+    })
+    .eq("id", member.id);
 
-    if (memberUpdateError) return { ok: false, message: memberUpdateError.message };
+  if (memberUpdateError) return { ok: false, message: memberUpdateError.message };
 
-    try {
-      await insertWalletLedgers({
-        memberId: member.id,
-        orderId: order.id,
-        type: "purchase",
-        amount: -totalAmount,
-        balanceAfter,
-        note: "訂單扣款",
-        createdBy: "system"
-      });
-    } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : "流水帳建立失敗。" };
-    }
+  try {
+    await insertWalletLedgers({
+      memberId: member.id,
+      orderId: order.id,
+      type: "purchase",
+      amount: -totalAmount,
+      balanceAfter,
+      note: "訂單扣款",
+      createdBy: "system"
+    });
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "流水帳建立失敗。" };
+  }
+
+  if (member.line_user_id) {
+    await sendLineMessage(
+      member.line_user_id,
+      `訂單已建立。\n本次扣款：${totalAmount} 元\n目前餘額：${balanceAfter} 元`
+    );
   }
 
   revalidatePath("/");
@@ -515,7 +585,7 @@ export async function createOrderAction(
     ok: true,
     data: {
       orderNo,
-      paymentStatus: canDeduct ? "已扣款" : "待付款",
+      paymentStatus: "已扣款",
       balanceAfter
     }
   };
@@ -637,7 +707,7 @@ async function getAccountDataForMember(supabase: any, member: any): Promise<Acti
       .order("created_at", { ascending: false }),
     supabase
       .from("wallet_logs")
-      .select("id,member_id,order_id,topup_id,type,amount,balance_after,note,created_at")
+      .select("id,member_id,order_id,topup_id,type,amount,balance_after,description,note,created_at")
       .eq("member_id", member.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -754,6 +824,71 @@ export async function createTopupAction(input: TopupValues): Promise<ActionResul
   revalidatePath("/member-center");
   revalidatePath("/admin/topups");
   return { ok: true, data: mapTopup(data) };
+}
+
+export async function createTopupRequestByPhoneAction(input: {
+  phone: string;
+  amount: number;
+  bankLast5: string;
+}): Promise<ActionResult<TopupRequest>> {
+  const supabase = createAdminSupabaseClient();
+  if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
+
+  const phone = normalizePhone(input.phone);
+  const amount = Number(input.amount ?? 0);
+  const bankLast5 = String(input.bankLast5 ?? "").trim();
+
+  if (!phone) return { ok: false, message: "請輸入手機號碼。" };
+  if (!Number.isFinite(amount) || amount < 1000) return { ok: false, message: "最低儲值金額為 1000 元。" };
+  if (!/^\d{5}$/.test(bankLast5)) return { ok: false, message: "請輸入匯款帳號末五碼。" };
+
+  const { data: members, error: memberError } = await supabase
+    .from("members")
+    .select("*")
+    .eq("is_active", true);
+
+  if (memberError) return { ok: false, message: memberError.message };
+
+  const member = members?.find((row) => normalizePhone(row.phone) === phone);
+  if (!member) return { ok: false, message: "查無會員資料，請先加入會員或確認手機號碼。" };
+
+  const payload = {
+    member_id: member.id,
+    amount,
+    last5: bankLast5,
+    payment_method: "bank_transfer",
+    note: `匯款末五碼：${bankLast5}`,
+    status: "pending"
+  };
+
+  let { data, error } = await supabase
+    .from("topup_requests")
+    .insert(payload)
+    .select("id,member_id,amount,payment_method,note,status,created_at,confirmed_at")
+    .single();
+
+  if (error && (isMissingColumn(error, "last5") || `${error.message}`.includes("topup_requests_status_check"))) {
+    const { last5: _unusedLast5, ...fallbackPayload } = {
+      ...payload,
+      status: "待確認"
+    };
+    const fallback = await supabase
+      .from("topup_requests")
+      .insert(fallbackPayload)
+      .select("id,member_id,amount,payment_method,note,status,created_at,confirmed_at")
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error || !data) return { ok: false, message: error?.message ?? "儲值申請建立失敗。" };
+
+  revalidatePath("/topup");
+  revalidatePath("/account");
+  revalidatePath("/member-center");
+  revalidatePath("/admin/members");
+
+  return { ok: true, data: mapTopupRequest(data) };
 }
 
 export async function createTopupRequestAction(

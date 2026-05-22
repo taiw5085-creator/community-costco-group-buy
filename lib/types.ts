@@ -4,7 +4,20 @@ export type ProductCategory = (typeof productCategories)[number];
 export const shippingSizes = ["小件", "中件", "大件"] as const;
 export type ShippingSize = (typeof shippingSizes)[number];
 
-export const orderStatuses = ["待付款", "已付款", "採購中", "已到貨", "已領貨", "已取消", "退款完成"] as const;
+export const orderStatuses = [
+  "placed",
+  "purchasing",
+  "arrived",
+  "picked_up",
+  "cancelled",
+  "待付款",
+  "已付款",
+  "採購中",
+  "已到貨",
+  "已領貨",
+  "已取消",
+  "退款完成"
+] as const;
 export type OrderStatus = (typeof orderStatuses)[number];
 
 export const paymentStatuses = ["待付款", "已扣款", "已退款"] as const;
@@ -16,7 +29,7 @@ export type WalletTransactionType = (typeof walletTransactionTypes)[number];
 export const walletLogTypes = ["topup", "purchase", "refund", "adjustment"] as const;
 export type WalletLogType = (typeof walletLogTypes)[number];
 
-export const topupRequestStatuses = ["待確認", "已入帳", "已取消"] as const;
+export const topupRequestStatuses = ["pending", "confirmed", "cancelled", "待確認", "已入帳", "已取消"] as const;
 export type TopupRequestStatus = (typeof topupRequestStatuses)[number];
 
 export const topupStatuses = ["pending", "approved", "rejected"] as const;

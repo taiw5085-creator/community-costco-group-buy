@@ -119,8 +119,8 @@ function mapProduct(row: any): AdminProduct {
     imageUrl: row.image_url,
     category: row.category,
     spec: row.spec,
-    price: toNumber(row.price),
-    cost: toNumber(row.cost),
+    price: toNumber(row.sell_price ?? row.price),
+    cost: toNumber(row.cost_price ?? row.cost),
     shippingFee: toNumber(row.shipping_fee),
     shippingType: row.shipping_type || "中件",
     profit: toNumber(row.profit),
@@ -163,7 +163,7 @@ function mapTransaction(row: any): WalletTransaction {
     type: row.type,
     amount: toNumber(row.amount),
     balanceAfter: toNumber(row.balance_after),
-    note: row.note,
+    note: row.description ?? row.note,
     createdBy: row.created_by,
     createdAt: row.created_at
   };
@@ -220,6 +220,7 @@ async function insertWalletLedgers(input: {
     type: input.type,
     amount: input.amount,
     balance_after: input.balanceAfter,
+    description: input.note,
     note: input.note
   });
 
@@ -398,7 +399,9 @@ export async function saveProductAction(input: ProductFormValues): Promise<Admin
     image_url: values.imageUrl || null,
     category: values.category,
     cost: values.cost,
+    cost_price: values.cost,
     price: values.price,
+    sell_price: values.price,
     shipping_fee: shippingFee,
     shipping_type: values.shippingType,
     profit,
@@ -417,8 +420,18 @@ export async function saveProductAction(input: ProductFormValues): Promise<Admin
     if (findError) return { ok: false, message: findError.message };
 
     let { error } = await supabase.from("products").update(payload).eq("id", values.id);
-    if (error && isMissingColumn(error, "spec")) {
-      const { spec: _unused, ...fallbackPayload } = payload;
+    if (
+      error &&
+      (isMissingColumn(error, "spec") ||
+        isMissingColumn(error, "cost_price") ||
+        isMissingColumn(error, "sell_price"))
+    ) {
+      const {
+        spec: _unusedSpec,
+        cost_price: _unusedCostPrice,
+        sell_price: _unusedSellPrice,
+        ...fallbackPayload
+      } = payload;
       ({ error } = await supabase.from("products").update(fallbackPayload).eq("id", values.id));
     }
     if (error) return { ok: false, message: error.message };
@@ -431,8 +444,18 @@ export async function saveProductAction(input: ProductFormValues): Promise<Admin
       ...payload,
       slug: slugify(values.name)
     });
-    if (error && isMissingColumn(error, "spec")) {
-      const { spec: _unused, ...fallbackPayload } = payload;
+    if (
+      error &&
+      (isMissingColumn(error, "spec") ||
+        isMissingColumn(error, "cost_price") ||
+        isMissingColumn(error, "sell_price"))
+    ) {
+      const {
+        spec: _unusedSpec,
+        cost_price: _unusedCostPrice,
+        sell_price: _unusedSellPrice,
+        ...fallbackPayload
+      } = payload;
       ({ error } = await supabase.from("products").insert({
         ...fallbackPayload,
         slug: slugify(values.name)
@@ -474,10 +497,21 @@ export async function updateOrderStatusAction(input: unknown): Promise<AdminActi
   const supabase = createAdminSupabaseClient();
   if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
 
-  const payload: Record<string, unknown> = { status: values.status };
+  const statusMap: Record<string, string> = {
+    待付款: "placed",
+    已付款: "placed",
+    採購中: "purchasing",
+    已到貨: "arrived",
+    已領貨: "picked_up",
+    已取消: "cancelled",
+    退款完成: "cancelled"
+  };
+  const nextStatus = statusMap[values.status] ?? values.status;
+  const payload: Record<string, unknown> = { status: nextStatus };
   if (values.status === "待付款") payload.payment_status = "待付款";
   if (values.status === "已付款") payload.payment_status = "已扣款";
   if (values.status === "退款完成") payload.payment_status = "已退款";
+  if (nextStatus === "picked_up") payload.picked_up_at = new Date().toISOString();
 
   const { error } = await supabase
     .from("orders")
@@ -556,7 +590,7 @@ export async function notifyOrderReadyAction(orderId: string): Promise<AdminActi
   const notifiedAt = new Date().toISOString();
   const { error } = await supabase
     .from("orders")
-    .update({ line_notified: true, notified_at: notifiedAt })
+    .update({ status: "arrived", line_notified: true, notified_at: notifiedAt })
     .eq("id", orderId);
 
   if (error) return { ok: false, message: error.message };
@@ -577,7 +611,7 @@ export async function cancelOrderAction(orderId: string): Promise<AdminActionRes
   if (error || !order) return { ok: false, message: error?.message ?? "找不到訂單。" };
 
   const orderStatus = normalizeOrderStatus(order.status, normalizePaymentStatus(order.payment_status));
-  if (orderStatus === "已取消" || orderStatus === "退款完成") return { ok: true };
+  if (orderStatus === "cancelled" || orderStatus === "已取消" || orderStatus === "退款完成") return { ok: true };
 
   if (order.payment_status === "已扣款" && order.member_id) {
     const currentBalance = toNumber(order.members?.balance);
@@ -608,11 +642,19 @@ export async function cancelOrderAction(orderId: string): Promise<AdminActionRes
   const { error: orderError } = await supabase
     .from("orders")
     .update({
-      status: order.payment_status === "已扣款" ? "退款完成" : "已取消",
+      status: "cancelled",
       payment_status: order.payment_status === "已扣款" ? "已退款" : "待付款"
     })
     .eq("id", order.id);
   if (orderError) return { ok: false, message: orderError.message };
+
+  if (order.members?.line_user_id) {
+    const refundText =
+      order.payment_status === "已扣款"
+        ? `您的訂單已取消，款項 ${toNumber(order.total_amount)} 元已退回會員餘額。`
+        : "您的訂單已取消。";
+    await sendLineMessage(order.members.line_user_id, refundText);
+  }
 
   revalidatePath("/admin");
   revalidatePath("/admin/members");
@@ -639,8 +681,14 @@ export async function batchOrderAction(input: {
   if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
 
   const payload: Record<string, unknown> = { status: input.action };
+  if (input.action === "採購中") payload.status = "purchasing";
   if (input.action === "已到貨") {
+    payload.status = "arrived";
     payload.estimated_arrival_date = getEstimatedArrivalDate(new Date());
+  }
+  if (input.action === "已領貨") {
+    payload.status = "picked_up";
+    payload.picked_up_at = new Date().toISOString();
   }
 
   const { error } = await supabase.from("orders").update(payload).in("id", orderIds);
@@ -720,7 +768,9 @@ export async function confirmTopupRequestAction(input: unknown): Promise<AdminAc
     .single();
 
   if (error || !request) return { ok: false, message: error?.message ?? "找不到儲值申請。" };
-  if (request.status !== "待確認") return { ok: false, message: "此儲值申請已處理，不能重複入帳。" };
+  if (!["待確認", "pending"].includes(request.status)) {
+    return { ok: false, message: "此儲值申請已處理，不能重複入帳。" };
+  }
   if (!request.member_id || !request.members) return { ok: false, message: "儲值申請沒有綁定會員。" };
 
   const amount = Math.abs(toNumber(request.amount));
@@ -753,13 +803,20 @@ export async function confirmTopupRequestAction(input: unknown): Promise<AdminAc
   const { error: requestError } = await supabase
     .from("topup_requests")
     .update({
-      status: "已入帳",
+      status: request.status === "pending" ? "confirmed" : "已入帳",
       confirmed_at: new Date().toISOString()
     })
     .eq("id", request.id)
-    .eq("status", "待確認");
+    .in("status", ["待確認", "pending"]);
 
   if (requestError) return { ok: false, message: requestError.message };
+
+  if (request.members.line_user_id) {
+    await sendLineMessage(
+      request.members.line_user_id,
+      `您已成功儲值 ${amount} 元，目前餘額：${balanceAfter} 元。`
+    );
+  }
 
   revalidatePath("/admin/members");
   revalidatePath("/admin");
@@ -776,9 +833,9 @@ export async function cancelTopupRequestAction(input: unknown): Promise<AdminAct
 
   const { error } = await supabase
     .from("topup_requests")
-    .update({ status: "已取消" })
+    .update({ status: "cancelled" })
     .eq("id", values.requestId)
-    .eq("status", "待確認");
+    .in("status", ["待確認", "pending"]);
 
   if (error) return { ok: false, message: error.message };
   revalidatePath("/admin/members");

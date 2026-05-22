@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, Send, UserPlus } from "lucide-react";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { joinMemberSchema, type JoinMemberValues } from "@/lib/schemas";
 
 export function JoinMemberForm() {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -38,8 +40,11 @@ export function JoinMemberForm() {
       }
 
       setSuccess(true);
-      setMessage("會員建立成功，請到 LINE 官方帳號輸入「綁定 手機號碼 棟別樓號」完成通知綁定。");
+      setMessage("會員建立成功，請至會員中心完成 LINE 綁定。");
       form.reset();
+      window.setTimeout(() => {
+        router.replace("/member-center");
+      }, 2000);
     });
   }
 

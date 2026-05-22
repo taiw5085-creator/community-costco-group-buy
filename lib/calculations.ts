@@ -140,6 +140,15 @@ export function formatDate(value: string | null) {
 }
 
 export function normalizeOrderStatus(status: string | null | undefined, paymentStatus?: PaymentStatus): OrderStatus {
+  if (
+    status === "placed" ||
+    status === "purchasing" ||
+    status === "arrived" ||
+    status === "picked_up" ||
+    status === "cancelled"
+  ) {
+    return status;
+  }
   if (status === "已下單") return paymentStatus === "已扣款" ? "已付款" : "待付款";
   if (status === "已領取") return "已領貨";
   if (

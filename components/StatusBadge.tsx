@@ -2,6 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import type { OrderStatus, PaymentStatus } from "@/lib/types";
 
 const statusStyles: Record<OrderStatus, "muted" | "deal" | "success" | "blue" | "danger"> = {
+  placed: "muted",
+  purchasing: "deal",
+  arrived: "blue",
+  picked_up: "success",
+  cancelled: "danger",
   待付款: "deal",
   已付款: "success",
   採購中: "deal",
@@ -11,8 +16,20 @@ const statusStyles: Record<OrderStatus, "muted" | "deal" | "success" | "blue" | 
   退款完成: "muted"
 };
 
+const statusLabels: Record<string, string> = {
+  placed: "已下單",
+  purchasing: "採購中",
+  arrived: "已到貨",
+  picked_up: "已領取",
+  cancelled: "已取消"
+};
+
+export function getOrderStatusLabel(status: OrderStatus) {
+  return statusLabels[status] ?? status;
+}
+
 export function StatusBadge({ status }: { status: OrderStatus }) {
-  return <Badge variant={statusStyles[status]}>{status}</Badge>;
+  return <Badge variant={statusStyles[status]}>{statusLabels[status] ?? status}</Badge>;
 }
 
 const paymentStyles: Record<PaymentStatus, "deal" | "success" | "blue"> = {

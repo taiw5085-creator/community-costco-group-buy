@@ -5,13 +5,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  BadgeCheck,
-  Building2,
-  CalendarCheck2,
-  Car,
   CircleDollarSign,
   ClipboardCheck,
-  Home,
   Loader2,
   MessageCircle,
   Minus,
@@ -28,7 +23,6 @@ import { createOrderAction } from "@/app/actions";
 import { ProductCard } from "@/components/ProductCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   formatCurrency,
@@ -169,7 +163,7 @@ ${url}`;
     }
 
     const confirmed = window.confirm(
-      "確認送出訂單？若餘額足夠會自動扣款；餘額不足會保留訂單並顯示待付款。"
+      "確認送出訂單？系統會先檢查會員餘額，餘額足夠才會扣款並成立訂單。"
     );
     if (!confirmed) return;
 
@@ -212,8 +206,14 @@ ${url}`;
 
           <div className="flex items-center gap-2">
             <Link
-              href="/join"
+              href="#products"
               className="inline-flex rounded-2xl border border-forest-100 bg-white px-3 py-3 text-xs font-black text-forest-700 shadow-sm sm:px-4 sm:text-sm"
+            >
+              查看商品
+            </Link>
+            <Link
+              href="/signup"
+              className="hidden rounded-2xl border border-forest-100 bg-white px-3 py-3 text-xs font-black text-forest-700 shadow-sm sm:inline-flex sm:px-4 sm:text-sm"
             >
               加入會員
             </Link>
@@ -244,7 +244,7 @@ ${url}`;
                   </p>
                   <div className="mt-5 grid gap-3 sm:max-w-2xl sm:grid-cols-3">
                     <Link
-                      href="/join"
+                      href="/signup"
                       className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-white px-4 py-3 text-base font-black text-forest-900"
                     >
                       加入會員
@@ -272,54 +272,19 @@ ${url}`;
               </div>
             </section>
 
-            <section className="mt-5 grid gap-3 sm:grid-cols-4">
-              <TrustCard icon={<Building2 />} title="社區集中代購" text="住戶一起買，管理員統一整理。" />
-              <TrustCard icon={<Home />} title="管理室統一領貨" text="到貨後不用等人，直接領取。" />
-              <TrustCard icon={<CalendarCheck2 />} title="每週固定採購" text="結單時間清楚，不怕漏單。" />
-              <TrustCard icon={<Car />} title="不用自己跑好市多" text="省下交通與排隊時間。" />
-            </section>
-
             <section className="mt-5 rounded-[1.75rem] border border-forest-100 bg-white p-4 shadow-soft">
               <div className="mb-4">
                 <p className="text-sm font-black text-forest-600">代購流程</p>
-                <h2 className="text-2xl font-black text-forest-900">五步驟完成</h2>
+                <h2 className="text-2xl font-black text-forest-900">從加入會員到管理室領貨</h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-5">
-                <ProcessStep icon={<ShoppingBasket />} step="1" title="選商品" />
-                <ProcessStep icon={<ClipboardCheck />} step="2" title="送出訂單" />
-                <ProcessStep icon={<Truck />} step="3" title="結單後採購" />
-                <ProcessStep icon={<MessageCircle />} step="4" title="到貨通知" />
-                <ProcessStep icon={<PackageCheck />} step="5" title="管理室領貨" />
-              </div>
-            </section>
-
-            <section className="mt-5 rounded-[1.75rem] border border-forest-100 bg-white p-4 shadow-soft sm:p-6">
-              <div className="mb-4">
-                <p className="text-sm font-black text-forest-600">Member Start</p>
-                <h2 className="text-2xl font-black text-forest-900">新會員快速開始</h2>
-                <p className="mt-2 font-bold leading-7 text-zinc-500">
-                  加入會員後即可儲值、下單、查詢餘額與消費紀錄。
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-4">
-                <QuickStartCard icon={<UserRound />} title="加入會員" text="加入 LINE 官方帳號，填寫基本資料即可開始使用。" />
-                <QuickStartCard icon={<CircleDollarSign />} title="會員儲值" text="最低儲值 $1000，完成轉帳後提交儲值申請。" />
-                <QuickStartCard icon={<MessageCircle />} title="系統通知" text="儲值成功、扣款、退款、到貨皆會自動通知。" />
-                <QuickStartCard icon={<BadgeCheck />} title="餘額查詢" text="會員可隨時查看餘額、儲值紀錄、消費紀錄與退款紀錄。" />
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <Link
-                  href="/join"
-                  className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-forest-600 px-4 py-3 text-lg font-black text-white"
-                >
-                  加入會員
-                </Link>
-                <Link
-                  href="/topup"
-                  className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-forest-100 bg-white px-4 py-3 text-lg font-black text-forest-700"
-                >
-                  我要儲值
-                </Link>
+              <div className="grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                <ProcessStep icon={<UserRound />} step="1" title="加入會員" />
+                <ProcessStep icon={<MessageCircle />} step="2" title="LINE 綁定" />
+                <ProcessStep icon={<CircleDollarSign />} step="3" title="儲值" />
+                <ProcessStep icon={<ShoppingBasket />} step="4" title="下單" />
+                <ProcessStep icon={<Truck />} step="5" title="結單採購" />
+                <ProcessStep icon={<ClipboardCheck />} step="6" title="到貨通知" />
+                <ProcessStep icon={<PackageCheck />} step="7" title="管理室領貨" />
               </div>
             </section>
 
@@ -333,8 +298,11 @@ ${url}`;
                   <div className="mt-3 grid gap-2 font-black leading-7 text-forest-800 sm:grid-cols-2">
                     <p>✅ 商品皆為代購服務，非現貨零售</p>
                     <p>✅ 結單後統一採購</p>
+                    <p>✅ 未結單前可取消</p>
+                    <p>✅ 結單後即進入採購流程，恕無法取消</p>
                     <p>✅ 缺貨退回會員餘額</p>
                     <p>✅ 到貨後 LINE 通知管理室領貨</p>
+                    <p>✅ 每筆儲值、扣款、退款皆有紀錄</p>
                   </div>
                 </div>
               </div>
@@ -372,7 +340,7 @@ ${url}`;
               </div>
 
               {isLoading && <LoadingState label="商品載入中" />}
-              {!isLoading && loadError && <ErrorState label={loadError} />}
+              {!isLoading && loadError && <ErrorState label="商品暫時無法載入，請稍後再試" />}
               {!isLoading && !loadError && filteredProducts.length === 0 && (
                 <EmptyState
                   label={
@@ -467,7 +435,7 @@ ${url}`;
             <div className="mt-5 rounded-3xl bg-forest-50 p-4">
               <SummaryRow label="商品件數" value={`${totalQuantity} 件`} />
               <SummaryRow label="商品總額" value={formatCurrency(subtotal)} />
-              <SummaryRow label="送出後狀態" value="餘額足夠會顯示已付款，餘額不足會顯示待付款" />
+              <SummaryRow label="送出後狀態" value="餘額足夠才會扣款並成立訂單" />
             </div>
 
             <form onSubmit={form.handleSubmit(submitOrder)} className="mt-6">
@@ -507,7 +475,15 @@ ${url}`;
 
               {message && (
                 <div className="mt-5 rounded-3xl bg-rose-50 p-4 text-sm font-black text-rose-600">
-                  {message}
+                  <p>{message}</p>
+                  {message.includes("餘額不足") && (
+                    <Link
+                      href="/topup"
+                      className="mt-3 inline-flex min-h-11 items-center justify-center rounded-2xl bg-forest-600 px-4 text-white"
+                    >
+                      我要儲值
+                    </Link>
+                  )}
                 </div>
               )}
 
@@ -598,34 +574,6 @@ export function ProductImage({ src, alt }: { src: string | null; alt: string }) 
   }
 
   return <img src={src} alt={alt} className="h-20 w-20 rounded-2xl object-cover" />;
-}
-
-function TrustCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <Card>
-      <CardContent className="flex gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-forest-100 text-forest-700 [&>svg]:h-6 [&>svg]:w-6">
-          {icon}
-        </div>
-        <div>
-          <h3 className="font-black text-forest-900">{title}</h3>
-          <p className="mt-1 text-sm font-bold leading-6 text-zinc-500">{text}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickStartCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <div className="rounded-3xl border border-forest-100 bg-forest-50 p-4">
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-forest-700 shadow-sm [&>svg]:h-6 [&>svg]:w-6">
-        {icon}
-      </div>
-      <h3 className="mt-3 text-lg font-black text-forest-900">{title}</h3>
-      <p className="mt-2 text-sm font-bold leading-6 text-zinc-500">{text}</p>
-    </div>
-  );
 }
 
 function ProcessStep({ icon, step, title }: { icon: React.ReactNode; step: string; title: string }) {

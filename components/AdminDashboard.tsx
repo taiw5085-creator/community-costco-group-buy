@@ -29,7 +29,7 @@ import {
   updateOrderStatusAction
 } from "@/app/admin/actions";
 import { ProductImageUpload } from "@/components/admin/product-image-upload";
-import { PaymentStatusBadge, StatusBadge } from "@/components/StatusBadge";
+import { getOrderStatusLabel, PaymentStatusBadge, StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,8 +106,8 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
     const grossProfit = todayOrders.reduce((sum, order) => sum + order.totalProfit, 0);
     const memberBalance = initialData.members.reduce((sum, member) => sum + member.balance, 0);
     const pendingPayments = orders.filter((order) => order.paymentStatus === "待付款").length;
-    const unpicked = orders.filter((order) => order.status === "已到貨").length;
-    const arrivedUnpicked = orders.filter((order) => order.status === "已到貨").length;
+    const unpicked = orders.filter((order) => order.status === "arrived" || order.status === "已到貨").length;
+    const arrivedUnpicked = orders.filter((order) => order.status === "arrived" || order.status === "已到貨").length;
     const todayRefundAmount = initialData.transactions
       .filter((tx) => tx.type === "refund" && new Date(tx.createdAt).toLocaleDateString("zh-TW") === today)
       .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
@@ -133,8 +133,8 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
       const matchesPayment = paymentFilter === "全部" || order.paymentStatus === paymentFilter;
       const matchesQuick =
         quickFilter === "全部" ||
-        (quickFilter === "未領貨" && order.status === "已到貨") ||
-        (quickFilter === "已到貨" && order.status === "已到貨") ||
+        (quickFilter === "未領貨" && (order.status === "arrived" || order.status === "已到貨")) ||
+        (quickFilter === "已到貨" && (order.status === "arrived" || order.status === "已到貨")) ||
         (quickFilter === "今日訂單" && new Date(order.createdAt).toLocaleDateString("zh-TW") === new Date().toLocaleDateString("zh-TW"));
       const text = `${order.orderNo} ${order.member?.name ?? ""} ${order.member?.phone ?? ""} ${
         order.member?.lineName ?? ""
@@ -209,7 +209,15 @@ export function AdminDashboard({ initialData }: { initialData: DashboardData }) 
               status === "待付款" ? "待付款" :
               status === "退款完成" ? "已退款" :
               order.paymentStatus;
-            return { ...order, status, paymentStatus };
+            const normalizedStatus: OrderStatus = (
+              status === "採購中" ? "purchasing" :
+              status === "已到貨" ? "arrived" :
+              status === "已領貨" ? "picked_up" :
+              status === "已取消" || status === "退款完成" ? "cancelled" :
+              status === "已付款" || status === "待付款" ? "placed" :
+              status
+            ) as OrderStatus;
+            return { ...order, status: normalizedStatus, paymentStatus };
           })
         );
       }
@@ -605,7 +613,7 @@ function OrderCard({
           >
             {orderStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {getOrderStatusLabel(status)}
               </option>
             ))}
           </select>
@@ -638,7 +646,7 @@ function OrderCard({
           <Bell className="h-5 w-5" />
           {order.lineNotified ? "已通知" : "通知領貨"}
         </Button>
-        {order.status !== "已取消" && order.status !== "退款完成" && (
+        {order.status !== "cancelled" && order.status !== "已取消" && order.status !== "退款完成" && (
           <Button type="button" variant="outline" className="text-rose-600" onClick={onCancel}>
             取消訂單 / 退款
           </Button>

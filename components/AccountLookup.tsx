@@ -33,7 +33,7 @@ export function AccountLookup() {
   });
 
   const unpickedOrders = useMemo(
-    () => result?.orders.filter((order) => order.status === "已到貨") ?? [],
+    () => result?.orders.filter((order) => order.status === "arrived" || order.status === "已到貨") ?? [],
     [result]
   );
 
@@ -72,7 +72,7 @@ export function AccountLookup() {
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <Link
-              href="/join"
+              href="/signup"
               className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-forest-100 bg-white px-4 text-sm font-black text-forest-700"
             >
               加入會員
@@ -152,6 +152,19 @@ export function AccountLookup() {
                             </p>
                           </div>
                           <TopupStatusPill status={topup.status} />
+                        </div>
+                      </div>
+                    ))}
+                    {result.topupRequests.map((request) => (
+                      <div key={request.id} className="rounded-3xl border border-forest-100 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-black text-forest-900">{formatCurrency(request.amount)}</p>
+                            <p className="mt-1 text-sm font-bold text-zinc-500">
+                              {request.note ?? "儲值申請"} ・ {formatDateTime(request.createdAt)}
+                            </p>
+                          </div>
+                          <TopupStatusPill status={request.status} />
                         </div>
                       </div>
                     ))}
@@ -263,11 +276,16 @@ function RecordSection({ title, logs }: { title: string; logs: AccountLookupResu
 }
 
 function TopupStatusPill({ status }: { status: string }) {
-  const label = status === "approved" ? "已通過" : status === "rejected" ? "已拒絕" : "待審核";
+  const label =
+    status === "approved" || status === "confirmed" || status === "已入帳"
+      ? "已入帳"
+      : status === "rejected" || status === "cancelled" || status === "已取消"
+        ? "已取消"
+        : "待審核";
   const tone =
-    status === "approved"
+    status === "approved" || status === "confirmed" || status === "已入帳"
       ? "bg-forest-50 text-forest-700"
-      : status === "rejected"
+      : status === "rejected" || status === "cancelled" || status === "已取消"
         ? "bg-rose-50 text-rose-600"
         : "bg-honey-50 text-honey-700";
   return <span className={`rounded-full px-3 py-1 text-sm font-black ${tone}`}>{label}</span>;

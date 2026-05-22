@@ -246,7 +246,7 @@ export function AdminMembers({ initialData }: { initialData: DashboardData }) {
                           <span className="rounded-full bg-forest-50 px-3 py-1 text-sm font-black text-forest-700">
                             {request.status}
                           </span>
-                          {request.status === "待確認" && (
+                          {["待確認", "pending"].includes(request.status) && (
                             <>
                               <Button type="button" disabled={isPending} onClick={() => confirmRequest(request.id)}>
                                 <CheckCircle2 className="h-4 w-4" />
