@@ -24,7 +24,7 @@ import {
   Truck,
   UserRound
 } from "lucide-react";
-import { createOrderAction, listPublicProductsAction } from "@/app/actions";
+import { createOrderAction } from "@/app/actions";
 import { ProductCard } from "@/components/ProductCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,16 +57,21 @@ const defaultCustomer: CheckoutFormValues = {
   note: ""
 };
 
-export default function Storefront() {
-  const [products, setProducts] = useState<PublicProduct[]>([]);
+type StorefrontProps = {
+  initialProducts?: PublicProduct[];
+  initialLoadError?: string;
+};
+
+export default function Storefront({ initialProducts = [], initialLoadError = "" }: StorefrontProps) {
+  const [products] = useState<PublicProduct[]>(initialProducts);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [screen, setScreen] = useState<"shop" | "checkout" | "success">("shop");
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | "全部">("全部");
   const [latestOrder, setLatestOrder] = useState<LastOrder | null>(null);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [isLoading] = useState(false);
+  const [loadError] = useState(initialLoadError);
   const [isPending, startTransition] = useTransition();
   const [now, setNow] = useState(new Date());
 
@@ -79,24 +84,6 @@ export default function Storefront() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    async function loadProducts() {
-      setIsLoading(true);
-      const result = await listPublicProductsAction();
-
-      if (!result.ok) {
-        setLoadError(result.message ?? "商品讀取失敗");
-        setProducts([]);
-      } else {
-        setProducts(result.data ?? []);
-      }
-
-      setIsLoading(false);
-    }
-
-    void loadProducts();
   }, []);
 
   useEffect(() => {
@@ -129,7 +116,7 @@ export default function Storefront() {
   const subtotal = useMemo(() => getCartSubtotal(cartLines), [cartLines]);
   const totalQuantity = useMemo(() => getCartQuantity(cartLines), [cartLines]);
   const featuredDeadline = products
-    .filter((product) => !isClosed(product.deadline, now))
+    .filter((product) => product.deadline && !isClosed(product.deadline, now))
     .sort(
       (a, b) =>
         new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime()
@@ -255,11 +242,31 @@ ${url}`;
                   <p className="mt-3 max-w-2xl text-base leading-7 text-white/80">
                     選好商品送出訂單，結單後統一採買；到貨後會通知住戶到管理室領取。
                   </p>
+                  <div className="mt-5 grid gap-3 sm:max-w-2xl sm:grid-cols-3">
+                    <Link
+                      href="/join"
+                      className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-white px-4 py-3 text-base font-black text-forest-900"
+                    >
+                      加入會員
+                    </Link>
+                    <a
+                      href="#products"
+                      className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-honey-300 px-4 py-3 text-base font-black text-forest-950"
+                    >
+                      查看商品
+                    </a>
+                    <Link
+                      href="/member-center"
+                      className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-white/25 bg-white/10 px-4 py-3 text-base font-black text-white"
+                    >
+                      會員中心查餘額
+                    </Link>
+                  </div>
                 </div>
                 <div className="rounded-3xl bg-white/10 p-4">
                   <p className="text-sm font-bold text-white/70">最近結單</p>
                   <p className="mt-1 text-2xl font-black">
-                    {featuredDeadline ? formatDeadline(featuredDeadline.deadline, now) : "尚未設定"}
+                    {featuredDeadline ? formatDeadline(featuredDeadline.deadline, now) : "本週結單時間待公告"}
                   </p>
                 </div>
               </div>
@@ -324,16 +331,16 @@ ${url}`;
                 <div>
                   <h2 className="text-xl font-black text-forest-900">信任保證</h2>
                   <div className="mt-3 grid gap-2 font-black leading-7 text-forest-800 sm:grid-cols-2">
-                    <p>✅ 每筆儲值與消費都會留下紀錄</p>
-                    <p>✅ 未結單商品可取消</p>
-                    <p>✅ 會員可自行查詢餘額與明細</p>
-                    <p>✅ 儲值成功後會自動 LINE 通知</p>
+                    <p>✅ 商品皆為代購服務，非現貨零售</p>
+                    <p>✅ 結單後統一採購</p>
+                    <p>✅ 缺貨退回會員餘額</p>
+                    <p>✅ 到貨後 LINE 通知管理室領貨</p>
                   </div>
                 </div>
               </div>
             </section>
 
-            <section className="mt-6">
+            <section id="products" className="mt-6 scroll-mt-24">
               <div className="mb-4 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-forest-600">今日可代購</p>
@@ -367,7 +374,13 @@ ${url}`;
               {isLoading && <LoadingState label="商品載入中" />}
               {!isLoading && loadError && <ErrorState label={loadError} />}
               {!isLoading && !loadError && filteredProducts.length === 0 && (
-                <EmptyState label="尚未新增商品" />
+                <EmptyState
+                  label={
+                    products.length === 0
+                      ? "目前尚無可代購商品，請稍後查看"
+                      : "此分類目前沒有可代購商品"
+                  }
+                />
               )}
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
