@@ -77,8 +77,8 @@ export function JoinMemberForm() {
           router.replace("/member-center");
         }, 2000);
       } catch (error) {
-        console.error(error);
-        setMessage("會員建立失敗，請稍後再試。");
+        console.error("[SIGNUP_FETCH_FAILED]", error);
+        setMessage("會員建立失敗：網路連線失敗，請稍後再試。");
         return;
       }
     });
