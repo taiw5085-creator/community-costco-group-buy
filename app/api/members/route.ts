@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
-import { createAdminSupabaseClient, getAdminSupabaseConfigError } from "@/lib/supabase/admin";
+import { getAdminSupabaseConfigError, getAdminSupabaseRestConfig } from "@/lib/supabase/admin";
 import { normalizePhone } from "@/lib/calculations";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type CreateMemberPayload = {
   name?: string;
@@ -16,8 +19,39 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 }
 
 function toErrorDetail(error: unknown) {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: unknown }).cause;
+    return cause ? `${error.message}: ${String(cause)}` : error.message;
+  }
   return String(error);
+}
+
+function isMissingColumn(detail: string, column: string) {
+  return detail.toLowerCase().includes(column.toLowerCase()) && detail.toLowerCase().includes("column");
+}
+
+async function insertMember(payload: Record<string, unknown>) {
+  const config = getAdminSupabaseRestConfig();
+  if (!config) {
+    return { ok: false, detail: "SUPABASE_CLIENT_UNAVAILABLE" };
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/members`, {
+    method: "POST",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store"
+  });
+
+  if (response.ok) return { ok: true, detail: "" };
+
+  const detail = await response.text();
+  return { ok: false, detail: detail || `SUPABASE_HTTP_${response.status}` };
 }
 
 export async function POST(req: NextRequest) {
@@ -53,25 +87,40 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabase = createAdminSupabaseClient();
-  if (!supabase) {
-    return jsonResponse({ success: false, message: "SUPABASE_ENV_MISSING", detail: "SUPABASE_CLIENT_UNAVAILABLE" }, 500);
-  }
-
   let errorMessage = "";
 
+  const memberPayload: Record<string, unknown> = {
+    name,
+    phone,
+    line_name: lineName,
+    building,
+    note: note || null,
+    balance: 0,
+    line_bind_status: "pending",
+    created_at: new Date().toISOString()
+  };
+
   try {
-    const { error } = await supabase.from("members").insert({
-      name,
-      phone,
-      line_name: lineName,
-      building,
-      note: note || null,
-      balance: 0,
-      line_bind_status: "pending",
-      created_at: new Date().toISOString()
-    });
-    errorMessage = error?.message ?? "";
+    let result = await insertMember(memberPayload);
+
+    if (!result.ok && isMissingColumn(result.detail, "note")) {
+      const { note: _unusedNote, ...fallbackPayload } = memberPayload;
+      result = await insertMember(fallbackPayload);
+    }
+
+    if (!result.ok && isMissingColumn(result.detail, "line_bind_status")) {
+      const { line_bind_status: _unusedStatus, ...fallbackPayload } = memberPayload;
+      result = await insertMember(fallbackPayload);
+    }
+
+    if (!result.ok && result.detail.includes("line_bind_status")) {
+      result = await insertMember({
+        ...memberPayload,
+        line_bind_status: "未綁定"
+      });
+    }
+
+    errorMessage = result.ok ? "" : result.detail;
   } catch (error) {
     errorMessage = toErrorDetail(error);
   }
