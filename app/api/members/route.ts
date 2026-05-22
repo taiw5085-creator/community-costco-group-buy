@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createAdminSupabaseClient, getAdminSupabaseConfigError } from "@/lib/supabase/admin";
 import { normalizePhone } from "@/lib/calculations";
 
 type CreateMemberPayload = {
@@ -13,6 +13,11 @@ type CreateMemberPayload = {
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status });
+}
+
+function toErrorDetail(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 export async function POST(req: NextRequest) {
@@ -35,29 +40,49 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ success: false, message: "INVALID_MEMBER_PAYLOAD" }, 400);
   }
 
-  const supabase = createAdminSupabaseClient();
-  if (!supabase) {
-    return jsonResponse({ success: false, message: "SUPABASE_ENV_MISSING" }, 500);
+  const configError = getAdminSupabaseConfigError();
+  if (configError) {
+    console.error("[CREATE_MEMBER_ENV_FAILED]", configError);
+    return jsonResponse(
+      {
+        success: false,
+        message: "SUPABASE_ENV_MISSING",
+        detail: configError
+      },
+      500
+    );
   }
 
-  const { error } = await supabase.from("members").insert({
-    name,
-    phone,
-    line_name: lineName,
-    building,
-    note: note || null,
-    balance: 0,
-    line_bind_status: "pending",
-    created_at: new Date().toISOString()
-  });
+  const supabase = createAdminSupabaseClient();
+  if (!supabase) {
+    return jsonResponse({ success: false, message: "SUPABASE_ENV_MISSING", detail: "SUPABASE_CLIENT_UNAVAILABLE" }, 500);
+  }
 
-  if (error) {
-    console.error("[CREATE_MEMBER_FAILED]", error);
+  let errorMessage = "";
+
+  try {
+    const { error } = await supabase.from("members").insert({
+      name,
+      phone,
+      line_name: lineName,
+      building,
+      note: note || null,
+      balance: 0,
+      line_bind_status: "pending",
+      created_at: new Date().toISOString()
+    });
+    errorMessage = error?.message ?? "";
+  } catch (error) {
+    errorMessage = toErrorDetail(error);
+  }
+
+  if (errorMessage) {
+    console.error("[CREATE_MEMBER_FAILED]", errorMessage);
     return jsonResponse(
       {
         success: false,
         message: "SUPABASE_INSERT_FAILED",
-        detail: error.message
+        detail: errorMessage
       },
       500
     );
