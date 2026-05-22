@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MessageCircle, WalletCards } from "lucide-react";
-import { lookupMemberByLineUserIdAction } from "@/app/actions";
+import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, MessageCircle, RefreshCcw, UserRound, WalletCards } from "lucide-react";
+import { bindLineMemberAction, lookupMemberByLineUserIdAction } from "@/app/actions";
 import { PaymentStatusBadge, StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -50,12 +52,32 @@ function loadLiffSdk() {
 }
 
 export function MemberCenter() {
+  const router = useRouter();
   const [result, setResult] = useState<AccountLookupResult | null>(null);
   const [message, setMessage] = useState("正在透過 LINE 自動辨識會員...");
   const [isLoading, setIsLoading] = useState(true);
-  const [showBindGuide, setShowBindGuide] = useState(false);
+  const [showBindForm, setShowBindForm] = useState(false);
+  const [lineUserId, setLineUserId] = useState("");
+  const [bindPhone, setBindPhone] = useState("");
+  const [bindBuilding, setBindBuilding] = useState("");
+  const [bindMessage, setBindMessage] = useState("");
+  const [isBinding, setIsBinding] = useState(false);
+  const [bindSuccess, setBindSuccess] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
   const hasInitializedRef = useRef(false);
   const hasCalledLoginRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const timeout = window.setTimeout(() => {
+      setHasTimedOut(true);
+      setIsLoading(false);
+      setMessage("LINE 會員中心載入超過 5 秒，請重新整理再試。");
+    }, 5000);
+
+    return () => window.clearTimeout(timeout);
+  }, [isLoading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +94,7 @@ export function MemberCenter() {
 
       if (!liffId) {
         setIsLoading(false);
-        setShowBindGuide(false);
+        setShowBindForm(false);
         setMessage("尚未設定 LIFF ID");
         return;
       }
@@ -97,34 +119,36 @@ export function MemberCenter() {
 
         const profile = await window.liff.getProfile();
         console.log("profile.userId", profile.userId);
+        window.history.replaceState({}, document.title, `${window.location.origin}/member-center`);
 
         if (!profile.userId) {
           if (!cancelled) {
             setIsLoading(false);
-            setShowBindGuide(true);
+            setShowBindForm(false);
             setMessage("無法取得 LINE 身分，請重新開啟會員中心或確認 LINE 登入狀態。");
           }
           return;
         }
 
+        setLineUserId(profile.userId);
         const response = await lookupMemberByLineUserIdAction(profile.userId);
         if (cancelled) return;
         if (!response.ok || !response.data) {
           setIsLoading(false);
-          setShowBindGuide(true);
-          setMessage("尚未綁定 LINE，請先到官方帳號輸入綁定 手機號碼 棟別樓號");
+          setShowBindForm(true);
+          setMessage("尚未綁定 LINE，請輸入會員資料完成綁定。");
           return;
         }
 
         setResult(response.data);
         setMessage("");
         setIsLoading(false);
-        setShowBindGuide(false);
+        setShowBindForm(false);
       } catch (error) {
         console.error(error);
         if (!cancelled) {
           setIsLoading(false);
-          setShowBindGuide(true);
+          setShowBindForm(false);
           setMessage("LINE 會員辨識失敗，請確認 LIFF 設定或稍後再試。");
         }
       }
@@ -135,6 +159,37 @@ export function MemberCenter() {
       cancelled = true;
     };
   }, []);
+
+  async function submitBindForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lineUserId) {
+      setBindMessage("尚未取得 LINE 身分，請重新整理會員中心。");
+      return;
+    }
+
+    setIsBinding(true);
+    setBindMessage("");
+    const response = await bindLineMemberAction({
+      lineUserId,
+      phone: bindPhone,
+      building: bindBuilding
+    });
+    setIsBinding(false);
+
+    if (!response.ok || !response.data) {
+      setBindMessage(response.message ?? "找不到會員資料，請確認手機號碼與棟別樓號，或先加入會員。");
+      return;
+    }
+
+    setShowBindForm(false);
+    setBindSuccess(true);
+    setMessage("綁定成功");
+    setBindMessage("綁定成功");
+    window.setTimeout(() => {
+      router.replace("/member-center");
+      router.refresh();
+    }, 2000);
+  }
 
   const unpickedOrders = useMemo(
     () => result?.orders.filter((order) => order.status === "已到貨") ?? [],
@@ -152,26 +207,73 @@ export function MemberCenter() {
             {isLoading ? <Loader2 className="h-7 w-7 animate-spin" /> : <MessageCircle className="h-7 w-7" />}
           </div>
           <h1 className="mt-4 text-2xl font-black text-forest-900">
-            {isLoading ? "LINE 會員辨識中" : "會員中心"}
+            {isLoading ? "LINE 會員辨識中" : bindSuccess ? "綁定成功" : "會員中心"}
           </h1>
           <p className="mt-3 font-bold leading-7 text-zinc-500">
             {message || "請稍候，正在載入您的會員資料。"}
           </p>
-          {showBindGuide && (
-            <div className="mt-5 space-y-3">
-              <div className="rounded-2xl bg-forest-50 p-4 text-left font-bold leading-7 text-forest-800">
-                <p>請加入 LINE 官方帳號，並傳送：</p>
-                <p className="mt-2 rounded-xl bg-white px-3 py-2 font-black text-forest-900">
-                  綁定 0912345678 416 14F2
+          {hasTimedOut && !showBindForm && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-forest-600 px-4 font-black text-white"
+            >
+              <RefreshCcw className="h-5 w-5" />
+              重新整理
+            </button>
+          )}
+          {showBindForm && (
+            <form onSubmit={submitBindForm} className="mt-5 space-y-4 text-left">
+              <div className="rounded-2xl bg-forest-50 p-4 font-bold leading-7 text-forest-800">
+                <p className="font-black text-forest-900">LINE 綁定表單</p>
+                <p className="mt-1 text-sm text-zinc-600">
+                  請輸入加入會員時填寫的手機號碼與棟別樓號，系統會把您的 LINE 綁到會員資料。
                 </p>
               </div>
-              <Link
-                href="/line-bind"
-                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-forest-600 px-4 font-black text-white"
+              <label className="block">
+                <span className="text-sm font-black text-zinc-600">手機號碼</span>
+                <input
+                  value={bindPhone}
+                  onChange={(event) => setBindPhone(event.target.value)}
+                  placeholder="例如：0912345678"
+                  className="mt-2 min-h-12 w-full rounded-2xl border border-forest-100 bg-white px-4 text-base font-bold outline-none focus:border-forest-500 focus:ring-4 focus:ring-forest-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-black text-zinc-600">棟別樓號</span>
+                <input
+                  value={bindBuilding}
+                  onChange={(event) => setBindBuilding(event.target.value)}
+                  placeholder="例如：416 14F2"
+                  className="mt-2 min-h-12 w-full rounded-2xl border border-forest-100 bg-white px-4 text-base font-bold outline-none focus:border-forest-500 focus:ring-4 focus:ring-forest-100"
+                />
+              </label>
+              {bindMessage && (
+                <div
+                  className={`rounded-2xl p-4 text-center font-black ${
+                    bindMessage === "綁定成功"
+                      ? "bg-forest-50 text-forest-700"
+                      : "bg-rose-50 text-rose-600"
+                  }`}
+                >
+                  {bindMessage}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={isBinding}
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-forest-600 px-4 font-black text-white disabled:opacity-60"
               >
-                查看 LINE 綁定說明
+                {isBinding ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserRound className="h-5 w-5" />}
+                {isBinding ? "綁定中" : "確認綁定"}
+              </button>
+              <Link
+                href="/signup"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-forest-100 bg-white px-4 text-center font-black text-forest-700"
+              >
+                還不是會員？先加入會員
               </Link>
-            </div>
+            </form>
           )}
         </section>
       </main>

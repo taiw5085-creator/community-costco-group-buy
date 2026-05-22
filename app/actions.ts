@@ -21,6 +21,7 @@ import {
   makeLookupCode,
   makeOrderNo,
   makePickupCode,
+  normalizeBuilding,
   normalizeOrderStatus,
   normalizePaymentStatus,
   normalizePhone
@@ -567,6 +568,64 @@ export async function lookupMemberByLineUserIdAction(lineUserId: string): Promis
   }
 
   return getAccountDataForMember(supabase, member);
+}
+
+export async function bindLineMemberAction(input: {
+  lineUserId: string;
+  phone: string;
+  building: string;
+}): Promise<ActionResult<AccountLookupResult>> {
+  const supabase = createAdminSupabaseClient();
+  if (!supabase) return { ok: false, message: "尚未設定 Supabase。" };
+
+  const lineUserId = String(input.lineUserId ?? "").trim();
+  const phone = normalizePhone(input.phone);
+  const building = normalizeBuilding(input.building);
+
+  if (!lineUserId) return { ok: false, message: "尚未取得 LINE 身分，請重新開啟會員中心。" };
+  if (!phone || !building) return { ok: false, message: "請填寫手機號碼與棟別樓號。" };
+
+  const { data: members, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("is_active", true);
+
+  if (error) return { ok: false, message: error.message };
+
+  const member = members?.find(
+    (row) => normalizePhone(row.phone) === phone && normalizeBuilding(row.building) === building
+  );
+
+  if (!member) {
+    return {
+      ok: false,
+      message: "找不到會員資料，請確認手機號碼與棟別樓號，或先加入會員。"
+    };
+  }
+
+  const boundAt = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("members")
+    .update({
+      line_user_id: lineUserId,
+      line_bind_status: "bound",
+      line_bound_at: boundAt
+    })
+    .eq("id", member.id);
+
+  if (updateError) return { ok: false, message: updateError.message };
+
+  revalidatePath("/member-center");
+  revalidatePath("/account");
+  revalidatePath("/admin/members");
+  revalidatePath("/admin");
+
+  return getAccountDataForMember(supabase, {
+    ...member,
+    line_user_id: lineUserId,
+    line_bind_status: "bound",
+    line_bound_at: boundAt
+  });
 }
 
 async function getAccountDataForMember(supabase: any, member: any): Promise<ActionResult<AccountLookupResult>> {
