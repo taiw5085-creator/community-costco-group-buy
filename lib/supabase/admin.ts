@@ -8,9 +8,6 @@ export type AdminSupabaseConfigError =
   | "SUPABASE_SERVICE_ROLE_KEY_INVALID"
   | "SUPABASE_SERVICE_ROLE_KEY_NOT_SERVICE_ROLE";
 
-const FALLBACK_SUPABASE_URL = "https://maaudmnlcdvoogvhpomv.supabase.co";
-const FALLBACK_SUPABASE_HOST = "maaudmnlcdvoogvhpomv.supabase.co";
-
 function isAsciiHeaderValue(value: string) {
   return /^[\x20-\x7E]+$/.test(value);
 }
@@ -44,14 +41,13 @@ export function getAdminSupabaseRestConfig() {
 
 function getAdminSupabaseUrl() {
   const normalizedUrl = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  if (!normalizedUrl) return FALLBACK_SUPABASE_URL;
+  if (!normalizedUrl) return null;
 
   try {
-    const url = new URL(normalizedUrl);
-    if (url.hostname !== FALLBACK_SUPABASE_HOST) return FALLBACK_SUPABASE_URL;
+    new URL(normalizedUrl);
     return normalizedUrl;
   } catch {
-    return FALLBACK_SUPABASE_URL;
+    return null;
   }
 }
 
